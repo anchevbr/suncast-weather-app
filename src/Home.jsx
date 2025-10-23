@@ -306,7 +306,9 @@ const Home = () => {
       <div 
         className="min-w-full h-screen flex items-center justify-center relative overflow-hidden snap-start flex-shrink-0"
         style={{ 
-          filter: `blur(${Math.min(15, scrollProgress * 150)}px)`
+          // Smooth blur transition: 0px at 0%, gradually to 15px at 10%, stay at 15px until 100%
+          // Using exponential curve for more natural fade
+          filter: `blur(${scrollProgress <= 0.1 ? scrollProgress * 150 : 15}px)`
         }}
       >
         <div className="p-4 sm:p-6 md:p-8 lg:p-10 z-40 relative w-full max-w-7xl mx-auto">
@@ -417,22 +419,31 @@ const Home = () => {
                     blue = Math.round(255 * (1 - sunsetProgress)); // Fade blue from 255 to 0
                   }
                   
-                  // Very smooth transition from soft to sharp edges
-                  const sharpness = Math.min(1, Math.max(0, (scrollProgress - 0.4) / 0.6)); // 0 to 1 between 40-100%
+                  // Feathering transition: gradually reduce feathering from 0% to 100%
+                  // Calculate feather factor: 1.0 at start (full feather), 0.0 at 80%+ (sharp)
+                  const featherFactor = scrollProgress < 0.8 ? 1 - (scrollProgress / 0.8) : 0;
                   
-                  if (sharpness === 0) {
-                    // Soft gradient (0-40%)
-                    return `radial-gradient(circle, rgba(${red}, ${green}, ${blue}, 1) 0%, rgba(${red}, ${green}, ${blue}, 0.98) 10%, rgba(${red}, ${green}, ${blue}, 0.95) 20%, rgba(${red}, ${green}, ${blue}, 0.9) 30%, rgba(${red}, ${green}, ${blue}, 0.8) 40%, rgba(${red}, ${green}, ${blue}, 0.7) 50%, rgba(${red}, ${green}, ${blue}, 0.5) 60%, rgba(${red}, ${green}, ${blue}, 0.3) 70%, rgba(${red}, ${green}, ${blue}, 0.15) 80%, rgba(${red}, ${green}, ${blue}, 0.08) 90%, rgba(${red}, ${green}, ${blue}, 0.03) 95%, rgba(${red}, ${green}, ${blue}, 0.01) 98%, transparent 100%)`;
-                  } else {
-                    // Interpolate between soft and sharp gradients
-                    const softGradient = `radial-gradient(circle, rgba(${red}, ${green}, ${blue}, 1) 0%, rgba(${red}, ${green}, ${blue}, 0.98) 10%, rgba(${red}, ${green}, ${blue}, 0.95) 20%, rgba(${red}, ${green}, ${blue}, 0.9) 30%, rgba(${red}, ${green}, ${blue}, 0.8) 40%, rgba(${red}, ${green}, ${blue}, 0.7) 50%, rgba(${red}, ${green}, ${blue}, 0.5) 60%, rgba(${red}, ${green}, ${blue}, 0.3) 70%, rgba(${red}, ${green}, ${blue}, 0.15) 80%, rgba(${red}, ${green}, ${blue}, 0.08) 90%, rgba(${red}, ${green}, ${blue}, 0.03) 95%, rgba(${red}, ${green}, ${blue}, 0.01) 98%, transparent 100%)`;
-                    const sharpGradient = `radial-gradient(circle, rgba(${red}, ${green}, ${blue}, 1) 0%, rgba(${red}, ${green}, ${blue}, 1) 50%, rgba(${red}, ${green}, ${blue}, 0.8) 70%, rgba(${red}, ${green}, ${blue}, 0.3) 85%, transparent 100%)`;
-                    
-                    // Use sharp gradient when sharpness > 0.5, soft otherwise
-                    return sharpness > 0.5 ? sharpGradient : softGradient;
-                  }
+                  // Interpolate gradient stops based on featherFactor
+                  // When featherFactor = 1: soft, feathered (many gradual stops)
+                  // When featherFactor = 0: sharp (fewer stops, higher opacity)
+                  const a10 = 1 - (0.02 * featherFactor);  // 0.98 -> 1.0
+                  const a20 = 1 - (0.05 * featherFactor);  // 0.95 -> 1.0
+                  const a30 = 1 - (0.10 * featherFactor);  // 0.9 -> 1.0
+                  const a40 = 1 - (0.20 * featherFactor);  // 0.8 -> 1.0
+                  const a50 = 0.9 - (0.20 * featherFactor); // 0.7 -> 0.9
+                  const a60 = 0.9 - (0.40 * featherFactor); // 0.5 -> 0.9
+                  const a70 = 0.6 - (0.30 * featherFactor); // 0.3 -> 0.6
+                  const a80 = 0.3 - (0.15 * featherFactor); // 0.15 -> 0.3 (but this becomes 0.2 at sharp)
+                  const a90 = 0.2 - (0.12 * featherFactor); // 0.08 -> 0.2
+                  const a95 = 0.03 - (0.03 * featherFactor); // 0.03 -> 0 (invisible at sharp)
+                  const a98 = 0.01 - (0.01 * featherFactor); // 0.01 -> 0
+                  
+                  return `radial-gradient(circle, rgba(${red}, ${green}, ${blue}, 1) 0%, rgba(${red}, ${green}, ${blue}, ${a10}) 10%, rgba(${red}, ${green}, ${blue}, ${a20}) 20%, rgba(${red}, ${green}, ${blue}, ${a30}) 30%, rgba(${red}, ${green}, ${blue}, ${a40}) 40%, rgba(${red}, ${green}, ${blue}, ${a50}) 50%, rgba(${red}, ${green}, ${blue}, ${a60}) 60%, rgba(${red}, ${green}, ${blue}, ${a70}) 70%, rgba(${red}, ${green}, ${blue}, ${a80}) 80%, rgba(${red}, ${green}, ${blue}, ${a90}) 90%, rgba(${red}, ${green}, ${blue}, ${a95}) 95%, rgba(${red}, ${green}, ${blue}, ${a98}) 98%, transparent 100%)`;
                 })(),
-                filter: `blur(${Math.max(0, 8 - scrollProgress * 8)}px)`,
+                // Smooth exponential blur reduction: 8px at 0%, gradually to 0px at 80%, completely sharp at 100%
+                // Using quadratic easing for more natural transition (faster at start, slower at end)
+                // After 80% (4 seconds), transition to 0 blur for sharp sunset
+                filter: `blur(${scrollProgress < 0.8 ? 8 * Math.pow(1 - (scrollProgress / 0.8), 2) : 0}px)`,
                 zIndex: 2
               }}
             />
