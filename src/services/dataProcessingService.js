@@ -3,7 +3,7 @@
  * Handles both live and historical data processing
  */
 
-import { getCloudTypeFromWeatherCode, getSunsetQualityScore } from '../utils/weatherCalculations.js';
+import { getCloudTypeFromWeatherCode, getSunsetQualityScore } from './scoringService.js';
 
 /**
  * Process historical weather data to calculate sunset scores for each day

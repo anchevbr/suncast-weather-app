@@ -325,6 +325,21 @@ function processForecastData(weatherData, aqiData, lat, lon) {
   };
 }
 
+// Clear all caches endpoint
+app.post('/api/clear-cache', async (req, res) => {
+  try {
+    await redis.flushAll();
+    res.json({ 
+      success: true, 
+      message: 'All caches cleared successfully' 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to clear caches' 
+    });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Suncast Backend API running on port ${PORT}`);

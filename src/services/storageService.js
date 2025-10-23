@@ -191,3 +191,45 @@ export const clearHistoricalCache = () => {
     console.error('Error clearing historical cache:', error);
   }
 };
+
+/**
+ * Clear all caches (localStorage and Redis)
+ * Use this to start fresh
+ */
+export const clearAllCaches = async () => {
+  try {
+    // Clear localStorage
+    clearHistoricalCache();
+    
+    // Clear any other localStorage keys related to the app
+    const keys = Object.keys(localStorage);
+    const appKeys = keys.filter(key => 
+      key.startsWith('sunset_') || 
+      key.startsWith('weather_') || 
+      key.startsWith('forecast_')
+    );
+    
+    appKeys.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    
+    // Clear Redis cache via backend API
+    try {
+      const response = await fetch('http://localhost:3001/api/clear-cache', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        console.log('All caches cleared successfully');
+      }
+    } catch (error) {
+      console.log('Backend cache clear failed, but localStorage cleared');
+    }
+    
+  } catch (error) {
+    console.error('Error clearing all caches:', error);
+  }
+};
