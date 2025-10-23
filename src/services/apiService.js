@@ -32,7 +32,12 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
   const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
   const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
   
-  const url = `https://api.open-meteo.com/v1/forecast?` +
+  // Use customer API URL if API key is provided
+  const baseUrl = apiKey 
+    ? 'https://customer-api.open-meteo.com/v1/forecast'
+    : 'https://api.open-meteo.com/v1/forecast';
+  
+  const url = `${baseUrl}?` +
     `latitude=${coords.latitude}&` +
     `longitude=${coords.longitude}&` +
     `daily=weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise&` +
@@ -153,6 +158,8 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
 
 /**
  * Fetch historical weather data directly from Open-Meteo Archive API
+ * NOTE: Historical API requires Professional plan or higher
+ * Currently using free Archive API with rate limits
  * @param {number} latitude - Latitude coordinate
  * @param {number} longitude - Longitude coordinate
  * @returns {Promise<Object>} - Historical weather data object
@@ -162,9 +169,11 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
   const year = new Date().getFullYear();
   const today = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
   
-  // Add API key if using Open-Meteo Commercial (set in environment variable)
-  const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
-  const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
+  // NOTE: Current plan (Hobbyist) doesn't include historical API access
+  // Using free Archive API - may hit rate limits
+  // To upgrade: https://open-meteo.com/en/pricing (Professional plan)
+  const apiKey = ''; // Not using API key for historical data (not included in plan)
+  const apiKeyParam = '';
   
   const url = `https://archive-api.open-meteo.com/v1/archive?` +
     `latitude=${latitude}&` +
@@ -209,7 +218,12 @@ export const fetchHistoricalAirQualityData = async (latitude, longitude) => {
   const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
   const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
   
-  const url = `https://air-quality-api.open-meteo.com/v1/air-quality?` +
+  // Use customer API URL if API key is provided
+  const baseUrl = apiKey 
+    ? 'https://customer-air-quality-api.open-meteo.com/v1/air-quality'
+    : 'https://air-quality-api.open-meteo.com/v1/air-quality';
+  
+  const url = `${baseUrl}?` +
     `latitude=${latitude}&` +
     `longitude=${longitude}&` +
     `start_date=${startDate}&` +
