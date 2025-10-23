@@ -14,10 +14,16 @@ const Home = () => {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const containerRef = useRef(null);
   const rafRef = useRef(null); // RequestAnimationFrame reference for smooth updates
+  const isAutoScrollingRef = useRef(false); // Track if auto-scroll is active (using ref to avoid closure issues)
 
-  // Track horizontal scroll - update progress on every scroll (manual or auto)
+  // Track horizontal scroll - update progress ONLY for manual scrolling
   useEffect(() => {
     const handleScroll = () => {
+      // Ignore scroll events during auto-scroll animation (using ref to check current value)
+      if (isAutoScrollingRef.current) {
+        return;
+      }
+      
       // Cancel any pending RAF to avoid multiple updates per frame
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
@@ -29,6 +35,7 @@ const Home = () => {
           const scrollLeft = containerRef.current.scrollLeft;
           const maxScroll = containerRef.current.scrollWidth - containerRef.current.clientWidth;
           const progress = maxScroll > 0 ? scrollLeft / maxScroll : 0;
+          
           setScrollProgress(progress);
         }
       });
@@ -44,9 +51,9 @@ const Home = () => {
         }
       };
     }
-  }, []);
+  }, []); // Empty deps - only set up once, uses ref to check auto-scroll state
 
-  // Auto-scroll to forecast when ALL data is loaded (2 second smooth animation)
+  // Auto-scroll to forecast when ALL data is loaded (5 second smooth animation)
   useEffect(() => {
     if (forecast && isDataLoaded && containerRef.current) {
       
@@ -54,9 +61,12 @@ const Home = () => {
       const targetScroll = window.innerWidth;
       const startScroll = container.scrollLeft;
       const distance = targetScroll - startScroll;
-      const duration = 2500; // 2.5 seconds for smoother feel
+      const duration = 5000; // 5 seconds for smooth After Effects-style animation
       let startTime = null;
       let animationId = null;
+
+      // Enable auto-scroll mode (using ref to avoid re-renders)
+      isAutoScrollingRef.current = true;
 
       const animateScroll = (currentTime) => {
         // Start timer on first actual scroll movement, not on first frame call
@@ -70,18 +80,23 @@ const Home = () => {
         const timeElapsed = currentTime - startTime;
         const animProgress = Math.min(timeElapsed / duration, 1);
         
-        // Smooth easing function
-        const easeInOutQuad = animProgress < 0.5
-          ? 2 * animProgress * animProgress
-          : 1 - Math.pow(-2 * animProgress + 2, 2) / 2;
+        // After Effects-style smooth ease-in-ease-out curve
+        const easeInOutCubic = animProgress < 0.5
+          ? 4 * animProgress * animProgress * animProgress
+          : 1 - Math.pow(-2 * animProgress + 2, 3) / 2;
         
-        // Update scroll position - this triggers scroll event which updates scrollProgress state
-        container.scrollLeft = startScroll + distance * easeInOutQuad;
+        // Update scroll position
+        const newScrollLeft = startScroll + distance * easeInOutCubic;
+        container.scrollLeft = newScrollLeft;
+        
+        // Update scrollProgress to drive all visual effects (sun, background, blur)
+        setScrollProgress(easeInOutCubic);
         
         if (animProgress < 1) {
           animationId = requestAnimationFrame(animateScroll);
         } else {
-          // Animation completed - stop loading
+          // Animation completed - disable auto-scroll mode and stop loading
+          isAutoScrollingRef.current = false;
           setIsLoading(false);
         }
       };
@@ -93,6 +108,7 @@ const Home = () => {
         if (animationId) {
           cancelAnimationFrame(animationId);
         }
+        isAutoScrollingRef.current = false;
       };
     }
   }, [forecast, isDataLoaded]);
@@ -258,7 +274,9 @@ const Home = () => {
         scrollBehavior: 'smooth',
         scrollSnapType: 'x mandatory',
         background: getBackgroundGradient(),
-        willChange: 'background'
+        willChange: 'background',
+        margin: 0,
+        padding: 0
       }}
     >
       <style>{`
@@ -285,7 +303,12 @@ const Home = () => {
       `}</style>
 
       {/* Hero Section */}
-      <div className="min-w-full h-screen flex items-center justify-center relative overflow-hidden snap-start flex-shrink-0">
+      <div 
+        className="min-w-full h-screen flex items-center justify-center relative overflow-hidden snap-start flex-shrink-0"
+        style={{ 
+          filter: `blur(${Math.min(15, scrollProgress * 150)}px)`
+        }}
+      >
         <div className="p-4 sm:p-6 md:p-8 lg:p-10 z-40 relative w-full max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -295,9 +318,9 @@ const Home = () => {
           >
             <div className="space-y-4 sm:space-y-6">
               <div className="text-center space-y-2">
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-light tracking-wide bg-gradient-to-r from-blue-200 via-yellow-200 to-orange-300 bg-clip-text text-transparent" style={{ animation: 'pulse 4s ease-in-out infinite' }}>
-                  Golden Hour
-                </h1>
+                      <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-light tracking-wide bg-gradient-to-r from-blue-800 via-yellow-600 to-orange-700 bg-clip-text text-transparent" style={{ animation: 'pulse 4s ease-in-out infinite' }}>
+                        Golden Hour
+                      </h1>
                 <p className="text-xs sm:text-sm md:text-base text-white/80 font-normal max-w-md mx-auto leading-relaxed px-4">
                   Will tonight's sunset be spectacular?
                 </p>
@@ -358,19 +381,66 @@ const Home = () => {
         }}
       >
           <div className="relative" style={{ width: 'clamp(80px, 12vw, 140px)', height: 'clamp(80px, 12vw, 140px)' }}>
-            {/* Extreme overexposed sun with no visible edge */}
+            {/* Large overexposed halo - much bigger than sun, extreme feathering */}
+            <div 
+              className="absolute rounded-full"
+              style={{
+                width: 'clamp(200px, 30vw, 400px)',
+                height: 'clamp(200px, 30vw, 400px)',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                background: 'radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.5) 20%, rgba(255, 255, 255, 0.4) 40%, rgba(255, 255, 255, 0.3) 60%, rgba(255, 255, 255, 0.2) 80%, rgba(255, 255, 255, 0.1) 90%, transparent 100%)',
+                filter: 'blur(50px)',
+                zIndex: 1
+              }}
+            />
+            
+            {/* Extreme overexposed sun with no visible edge - red tint when setting */}
             <div 
               className="absolute inset-0 rounded-full"
               style={{
-                background: 'radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.98) 10%, rgba(255, 255, 255, 0.95) 20%, rgba(255, 255, 255, 0.9) 30%, rgba(255, 255, 255, 0.8) 40%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0.5) 60%, rgba(255, 255, 255, 0.3) 70%, rgba(255, 255, 255, 0.15) 80%, rgba(255, 255, 255, 0.08) 90%, rgba(255, 255, 255, 0.03) 95%, rgba(255, 255, 255, 0.01) 98%, transparent 100%)',
-                filter: 'blur(8px)',
+                background: (() => {
+                  let red, green, blue;
+                  
+                  // Sun color transition over the entire 5-second animation
+                  if (scrollProgress < 0.2) {
+                    // White sun during "day" phase (0-20%)
+                    red = 255;
+                    green = 255;
+                    blue = 255;
+                  } else {
+                    // Red transition during "sunset" phase (20-100%) - 4 seconds of transition
+                    const sunsetProgress = (scrollProgress - 0.2) / 0.8; // 0 to 1 between 20-100%
+                    red = 255; // Always full red
+                    green = Math.round(255 * (1 - sunsetProgress)); // Fade green from 255 to 0
+                    blue = Math.round(255 * (1 - sunsetProgress)); // Fade blue from 255 to 0
+                  }
+                  
+                  // Very smooth transition from soft to sharp edges
+                  const sharpness = Math.min(1, Math.max(0, (scrollProgress - 0.4) / 0.6)); // 0 to 1 between 40-100%
+                  
+                  if (sharpness === 0) {
+                    // Soft gradient (0-40%)
+                    return `radial-gradient(circle, rgba(${red}, ${green}, ${blue}, 1) 0%, rgba(${red}, ${green}, ${blue}, 0.98) 10%, rgba(${red}, ${green}, ${blue}, 0.95) 20%, rgba(${red}, ${green}, ${blue}, 0.9) 30%, rgba(${red}, ${green}, ${blue}, 0.8) 40%, rgba(${red}, ${green}, ${blue}, 0.7) 50%, rgba(${red}, ${green}, ${blue}, 0.5) 60%, rgba(${red}, ${green}, ${blue}, 0.3) 70%, rgba(${red}, ${green}, ${blue}, 0.15) 80%, rgba(${red}, ${green}, ${blue}, 0.08) 90%, rgba(${red}, ${green}, ${blue}, 0.03) 95%, rgba(${red}, ${green}, ${blue}, 0.01) 98%, transparent 100%)`;
+                  } else {
+                    // Interpolate between soft and sharp gradients
+                    const softGradient = `radial-gradient(circle, rgba(${red}, ${green}, ${blue}, 1) 0%, rgba(${red}, ${green}, ${blue}, 0.98) 10%, rgba(${red}, ${green}, ${blue}, 0.95) 20%, rgba(${red}, ${green}, ${blue}, 0.9) 30%, rgba(${red}, ${green}, ${blue}, 0.8) 40%, rgba(${red}, ${green}, ${blue}, 0.7) 50%, rgba(${red}, ${green}, ${blue}, 0.5) 60%, rgba(${red}, ${green}, ${blue}, 0.3) 70%, rgba(${red}, ${green}, ${blue}, 0.15) 80%, rgba(${red}, ${green}, ${blue}, 0.08) 90%, rgba(${red}, ${green}, ${blue}, 0.03) 95%, rgba(${red}, ${green}, ${blue}, 0.01) 98%, transparent 100%)`;
+                    const sharpGradient = `radial-gradient(circle, rgba(${red}, ${green}, ${blue}, 1) 0%, rgba(${red}, ${green}, ${blue}, 1) 50%, rgba(${red}, ${green}, ${blue}, 0.8) 70%, rgba(${red}, ${green}, ${blue}, 0.3) 85%, transparent 100%)`;
+                    
+                    // Use sharp gradient when sharpness > 0.5, soft otherwise
+                    return sharpness > 0.5 ? sharpGradient : softGradient;
+                  }
+                })(),
+                filter: `blur(${Math.max(0, 8 - scrollProgress * 8)}px)`,
+                zIndex: 2
               }}
             />
         </div>
       </div>
 
       {/* Mountain silhouettes - scrolls with horizontal navigation, extended to cover all sections */}
-      <div className="absolute bottom-0 left-0 pointer-events-none z-30" style={{ width: '200vw', height: 'clamp(12rem, 30vh, 32rem)' }}>
+      <div className="fixed bottom-0 left-0 pointer-events-none z-30" style={{ width: '200vw', height: 'clamp(14rem, 35vh, 36rem)', transform: 'translateY(0px)' }}>
         {/* Back mountain layer - solid */}
         <div 
           className="absolute bottom-0 left-0 h-full"
