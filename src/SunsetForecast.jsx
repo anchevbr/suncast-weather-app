@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import DayCard from "./DayCard";
 import MinimalHistoricalSunsets from "./components/MinimalHistoricalSunsets";
 import { fetchHistoricalForecastWithProgress } from "./services/historicalService.js";
-import { getScoringSystem } from "./utils/colorPalette";
 
 const SunsetForecast = ({ forecast, onBack, onDataLoaded }) => {
   const [historicalData, setHistoricalData] = useState(null);

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import LocationAutocomplete from './components/LocationAutocomplete';
 import { fetchForecastData } from './services/apiService';
 import SunsetForecast from "./SunsetForecast";
-import { Sun, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 const Home = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -12,7 +12,6 @@ const Home = () => {
   const [error, setError] = useState(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const containerRef = useRef(null);
   const rafRef = useRef(null); // RequestAnimationFrame reference for smooth updates
 
@@ -50,7 +49,6 @@ const Home = () => {
   // Auto-scroll to forecast when ALL data is loaded (2 second smooth animation)
   useEffect(() => {
     if (forecast && isDataLoaded && containerRef.current) {
-      setIsAutoScrolling(true); // Start auto-scroll state
       
       const container = containerRef.current;
       const targetScroll = window.innerWidth;
@@ -84,7 +82,6 @@ const Home = () => {
           animationId = requestAnimationFrame(animateScroll);
         } else {
           // Animation completed - stop loading
-          setIsAutoScrolling(false);
           setIsLoading(false);
         }
       };
@@ -298,7 +295,7 @@ const Home = () => {
           >
             <div className="space-y-4 sm:space-y-6">
               <div className="text-center space-y-2">
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-light text-white tracking-wide">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-light tracking-wide bg-gradient-to-r from-blue-200 via-yellow-200 to-orange-300 bg-clip-text text-transparent" style={{ animation: 'pulse 4s ease-in-out infinite' }}>
                   Golden Hour
                 </h1>
                 <p className="text-xs sm:text-sm md:text-base text-white/80 font-normal max-w-md mx-auto leading-relaxed px-4">
@@ -327,11 +324,8 @@ const Home = () => {
                 </div>
               ) : (
                 <div className="flex items-center justify-center">
-                  <div className="relative">
-                    <div className="text-sm font-medium bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent animate-pulse">
-                      Loading data...
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-orange-400/20 via-pink-500/20 to-purple-600/20 blur-sm animate-pulse"></div>
+                  <div className="text-sm font-medium bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent animate-pulse">
+                    Loading data...
                   </div>
                 </div>
               )}
@@ -363,29 +357,15 @@ const Home = () => {
           transform: 'translateZ(0)' // GPU acceleration
         }}
       >
-        <div className="relative" style={{ width: 'clamp(80px, 12vw, 140px)', height: 'clamp(80px, 12vw, 140px)' }}>
-          {/* Minimal glow */}
-          <div 
-            className="absolute rounded-full"
-            style={{
-              width: '140%',
-              height: '140%',
-              top: '-20%',
-              left: '-20%',
-              background: 'radial-gradient(circle, rgba(255, 252, 230, 0.5) 0%, rgba(255, 250, 220, 0.3) 40%, transparent 70%)',
-              filter: 'blur(20px)',
-            }}
-          />
-          {/* Simple circle with yellow tint */}
-          <div 
-            className="relative rounded-full"
-            style={{
-              width: '100%',
-              height: '100%',
-              background: '#fffed8',
-              boxShadow: '0 0 40px rgba(255, 252, 230, 0.7)',
-            }}
-          />
+          <div className="relative" style={{ width: 'clamp(80px, 12vw, 140px)', height: 'clamp(80px, 12vw, 140px)' }}>
+            {/* Extreme overexposed sun with no visible edge */}
+            <div 
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: 'radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.98) 10%, rgba(255, 255, 255, 0.95) 20%, rgba(255, 255, 255, 0.9) 30%, rgba(255, 255, 255, 0.8) 40%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0.5) 60%, rgba(255, 255, 255, 0.3) 70%, rgba(255, 255, 255, 0.15) 80%, rgba(255, 255, 255, 0.08) 90%, rgba(255, 255, 255, 0.03) 95%, rgba(255, 255, 255, 0.01) 98%, transparent 100%)',
+                filter: 'blur(8px)',
+              }}
+            />
         </div>
       </div>
 

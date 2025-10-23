@@ -1,7 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { getHistoricalColors } from "../utils/colorPalette";
-import { Sparkles } from "lucide-react";
 
 const MinimalHistoricalSunsets = ({
   historicalData,
