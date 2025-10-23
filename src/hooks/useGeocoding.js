@@ -44,24 +44,25 @@ export const useGeocoding = () => {
         // Create new abort controller
         abortControllerRef.current = new AbortController();
 
+        // Get Mapbox API token from environment
+        const mapboxToken = import.meta.env.VITE_MAPBOX_API_KEY;
+        
+        if (!mapboxToken) {
+          throw new Error('Mapbox API key not found. Please add VITE_MAPBOX_API_KEY to your .env file');
+        }
+
+        // Mapbox Geocoding API - Forward Geocoding with Autocomplete
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?` +
-          `q=${encodeURIComponent(query)}&` +
-          `format=json&` +
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+          `access_token=${mapboxToken}&` +
+          `types=place,locality,neighborhood&` + // Focus on cities and populated areas
           `limit=8&` +
-          `addressdetails=1&` +
-          `extratags=1&` +
-          `featuretype=city&` +
-          `class=place&` +
-          `bounded=0&` +
-          `dedupe=1&` +
-          `polygon_geojson=0&` +
-          `email=your-email@domain.com&` +
-          `accept-language=en`,
+          `autocomplete=true&` + // Enable autocomplete suggestions
+          `language=en`,
           {
             signal: abortControllerRef.current.signal,
             headers: {
-              'User-Agent': 'Suncast Weather App'
+              'Content-Type': 'application/json'
             }
           }
         );
@@ -72,62 +73,42 @@ export const useGeocoding = () => {
 
         const data = await response.json();
 
-        if (!data || data.length === 0) {
+        if (!data || !data.features || data.features.length === 0) {
           setSuggestions([]);
           return;
         }
 
-        // Professional scoring algorithm
-        const scoredResults = data.map(result => {
-          let score = 0;
-          const displayName = result.display_name.toLowerCase();
-          const importance = parseFloat(result.importance) || 0;
-
-          // Capital city bonus (highest priority)
-          if (result.extratags?.capital === 'yes') {
-            score += 200;
-          }
-
-          // API importance weighting
-          score += importance * 150;
-
-          // Population-based scoring
-          if (result.extratags?.population) {
-            const population = parseInt(result.extratags.population);
-            if (population > 5000000) score += 25;
-            else if (population > 1000000) score += 20;
-            else if (population > 500000) score += 15;
-            else if (population > 100000) score += 10;
-            else if (population > 50000) score += 5;
-          }
-
-          // Type bonuses
-          if (result.type === 'city') score += 10;
-          if (result.class === 'place') score += 8;
-          if (result.type === 'town') score += 5;
-
-          // Tourism and cultural significance
-          if (result.extratags?.tourism) score += 8;
-          if (result.extratags?.historic) score += 6;
-
-          // Exact match bonus
-          if (displayName.startsWith(query.toLowerCase())) {
-            score += 15;
-          }
-
-          return { ...result, score };
+        // Convert Mapbox format to our existing format for compatibility
+        const convertedResults = data.features.map(feature => {
+          // Extract location details from Mapbox response
+          const context = feature.context || [];
+          const getContext = (type) => context.find(c => c.id.startsWith(type))?.text || '';
+          
+          return {
+            // Coordinates (Mapbox uses [longitude, latitude] format)
+            lat: feature.center[1],
+            lon: feature.center[0],
+            
+            // Display name (formatted location string)
+            display_name: feature.place_name,
+            
+            // Location details
+            name: feature.text,
+            type: feature.place_type[0],
+            
+            // Additional context for better display
+            region: getContext('region'),
+            country: getContext('country'),
+            
+            // Mapbox relevance score (0-1, higher is better)
+            importance: feature.relevance,
+            
+            // Original Mapbox data for reference
+            _mapbox: feature
+          };
         });
 
-        // Sort by score, then importance, then alphabetically
-        const sortedResults = scoredResults
-          .sort((a, b) => {
-            if (b.score !== a.score) return b.score - a.score;
-            if (b.importance !== a.importance) return b.importance - a.importance;
-            return a.display_name.localeCompare(b.display_name);
-          })
-          .slice(0, 5);
-
-        setSuggestions(sortedResults);
+        setSuggestions(convertedResults);
         } catch (error) {
           if (error.name !== 'AbortError') {
             setError('Unable to fetch location suggestions');
