@@ -314,29 +314,29 @@ const Home = () => {
                 placeholder="Enter location..."
               />
               
-              <div className="flex items-center justify-center space-x-2 sm:space-x-4 text-xs sm:text-sm text-white/70">
-                <button
-                  onClick={handleGetCurrentLocation}
-                  disabled={isLoading}
-                  className="flex items-center space-x-1 sm:space-x-2 hover:text-white transition-colors duration-200 disabled:opacity-50"
-                  aria-label="Use current location"
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
-                  ) : (
+              {!isLoading ? (
+                <div className="flex items-center justify-center space-x-2 sm:space-x-4 text-xs sm:text-sm text-white/70">
+                  <button
+                    onClick={handleGetCurrentLocation}
+                    className="flex items-center space-x-1 sm:space-x-2 hover:text-white transition-colors duration-200"
+                    aria-label="Use current location"
+                  >
                     <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                  )}
-                  <span>{isLoading ? 'Getting location...' : 'Use current location'}</span>
-                </button>
-              </div>
+                    <span>Use current location</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center">
+                  <div className="relative">
+                    <div className="text-sm font-medium bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent animate-pulse">
+                      Loading data...
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-orange-400/20 via-pink-500/20 to-purple-600/20 blur-sm animate-pulse"></div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {isLoading && (
-              <div className="mt-3 flex items-center justify-center space-x-2 text-white/60">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-xs">Loading...</span>
-              </div>
-            )}
 
             {error && (
               <div 
