@@ -15,6 +15,50 @@ const Home = () => {
   const containerRef = useRef(null);
   const rafRef = useRef(null); // RequestAnimationFrame reference for smooth updates
   const isAutoScrollingRef = useRef(false); // Track if auto-scroll is active (using ref to avoid closure issues)
+  
+  // Generate random cloud positions once on mount (stable across renders)
+  const cloudsRef = useRef(null);
+  if (!cloudsRef.current) {
+    // Seeded random for organic but consistent placement
+    const generateClouds = (count) => {
+      const clouds = [];
+      for (let i = 0; i < count; i++) {
+        clouds.push({
+          top: 15 + Math.random() * 45, // 15-60% from top
+          left: Math.random() * 95, // 0-95% from left (leave room for cloud width)
+          blur: 15 + Math.random() * 8, // 15-23px blur (less blur = more visible)
+          opacity: 0.25 + Math.random() * 0.15, // 0.25-0.40 opacity (much more visible!)
+          size: {
+            w: 150 + Math.random() * 180, // 150-330px width (bigger clouds)
+            h: 50 + Math.random() * 70 // 50-120px height (taller clouds)
+          },
+          circles: [
+            {
+              left: `${Math.random() * 5}%`,
+              top: `${35 + Math.random() * 15}%`,
+              width: `${36 + Math.random() * 8}%`,
+              height: `${54 + Math.random() * 12}%`
+            },
+            {
+              left: `${20 + Math.random() * 10}%`,
+              top: `${15 + Math.random() * 15}%`,
+              width: `${44 + Math.random() * 12}%`,
+              height: `${64 + Math.random() * 16}%`
+            },
+            {
+              left: `${45 + Math.random() * 10}%`,
+              top: `${30 + Math.random() * 15}%`,
+              width: `${38 + Math.random() * 10}%`,
+              height: `${58 + Math.random() * 14}%`
+            }
+          ]
+        });
+      }
+      return clouds;
+    };
+    
+    cloudsRef.current = generateClouds(18); // 18 random clouds
+  }
 
   // Track horizontal scroll - update progress ONLY for manual scrolling
   useEffect(() => {
@@ -320,7 +364,7 @@ const Home = () => {
           >
             <div className="space-y-4 sm:space-y-6">
               <div className="text-center space-y-2">
-                      <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-light tracking-wide bg-gradient-to-r from-blue-800 via-yellow-600 to-orange-700 bg-clip-text text-transparent" style={{ animation: 'pulse 4s ease-in-out infinite' }}>
+                      <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-wide bg-gradient-to-r from-blue-800 via-yellow-600 to-orange-700 bg-clip-text text-transparent" style={{ animation: 'pulse 4s ease-in-out infinite', letterSpacing: '-0.02em' }}>
                         Golden Hour
                       </h1>
                 <p className="text-xs sm:text-sm md:text-base text-white/80 font-normal max-w-md mx-auto leading-relaxed px-4">
@@ -372,7 +416,7 @@ const Home = () => {
 
       {/* Animated Sun - sets behind mountains as you scroll right (fixed position, only moves down) */}
       <div
-        className="fixed pointer-events-none z-20"
+        className="fixed pointer-events-none z-10"
         style={{
           left: '10%',
           top: `${20 + scrollProgress * 65}vh`,
@@ -448,6 +492,61 @@ const Home = () => {
               }}
             />
         </div>
+      </div>
+
+      {/* Organic Random Clouds - randomly positioned on each page load, optimized for performance */}
+      <div className="fixed inset-0 pointer-events-none z-5" style={{ overflow: 'hidden', willChange: 'transform' }}>
+        {(() => {
+          // Smooth color interpolation throughout the entire scroll (0-100%)
+          // Daylight colors
+          const daylight = { r: 255, g: 255, b: 255 };
+          // Sunset colors (orange/pink)
+          const sunset = { r: 255, g: 150, b: 125 };
+          
+          // Smooth linear interpolation from daylight to sunset
+          const red = Math.round(daylight.r + (sunset.r - daylight.r) * scrollProgress);
+          const green = Math.round(daylight.g + (sunset.g - daylight.g) * scrollProgress);
+          const blue = Math.round(daylight.b + (sunset.b - daylight.b) * scrollProgress);
+          
+          // Opacity fade is more gradual
+          const fadeAmount = scrollProgress * 0.08;
+          
+          return cloudsRef.current.map((cloud, idx) => (
+            <div 
+              key={idx}
+              className="absolute" 
+              style={{ 
+                top: `${cloud.top}%`, 
+                left: `${cloud.left}%`, 
+                filter: `blur(${cloud.blur}px)`, 
+                willChange: 'opacity' 
+              }}
+            >
+              <div style={{ 
+                position: 'relative', 
+                width: `${cloud.size.w}px`, 
+                height: `${cloud.size.h}px` 
+              }}>
+                {cloud.circles.map((circle, i) => (
+                  <div 
+                    key={i}
+                    className="absolute rounded-full" 
+                    style={{ 
+                      left: circle.left, 
+                      top: circle.top, 
+                      width: circle.width, 
+                      height: circle.height, 
+                      // Smooth color transition from white to orange/pink throughout scroll
+                      background: `rgba(${red}, ${green}, ${blue}, ${Math.max(0.1, cloud.opacity - fadeAmount)})`,
+                      transform: 'translateZ(0)', // GPU acceleration
+                      transition: 'background 0.1s ease-out' // Smooth color changes between frames
+                    }} 
+                  />
+                ))}
+              </div>
+            </div>
+          ));
+        })()}
       </div>
 
       {/* Mountain silhouettes - scrolls with horizontal navigation, extended to cover all sections */}
