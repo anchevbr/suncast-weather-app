@@ -154,13 +154,15 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
  * @returns {Promise<Object>} - Historical weather data object
  */
 export const fetchHistoricalWeatherData = async (latitude, longitude) => {
+  // Use current year from January 1st until today
   const year = new Date().getFullYear();
+  const today = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
   
   const url = `https://archive-api.open-meteo.com/v1/archive?` +
     `latitude=${latitude}&` +
     `longitude=${longitude}&` +
     `start_date=${year}-01-01&` +
-    `end_date=${year}-12-31&` +
+    `end_date=${today}&` +
     `hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,visibility,wind_speed_10m&` +
     `daily=weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise&` +
     `timezone=auto`;
