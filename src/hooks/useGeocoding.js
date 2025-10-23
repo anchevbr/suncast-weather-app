@@ -52,10 +52,11 @@ export const useGeocoding = () => {
         }
 
         // Mapbox Geocoding API - Forward Geocoding with Autocomplete
+        // Use global search without proximity bias for fair results
         const response = await fetch(
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
           `access_token=${mapboxToken}&` +
-          `types=place,locality,neighborhood&` + // Focus on cities and populated areas
+          `types=place&` + // Only cities and towns (removes neighborhoods/POIs)
           `limit=8&` +
           `autocomplete=true&` + // Enable autocomplete suggestions
           `language=en`,
@@ -101,6 +102,7 @@ export const useGeocoding = () => {
             country: getContext('country'),
             
             // Mapbox relevance score (0-1, higher is better)
+            // This already factors in population, query match, and importance
             importance: feature.relevance,
             
             // Original Mapbox data for reference
@@ -108,6 +110,8 @@ export const useGeocoding = () => {
           };
         });
 
+        // Mapbox already sorts results by relevance (includes population, importance, and query match)
+        // Trust their ranking algorithm - it's designed to prioritize major cities globally
         setSuggestions(convertedResults);
         } catch (error) {
           if (error.name !== 'AbortError') {

@@ -106,7 +106,7 @@ const Home = () => {
         latitude: parseFloat(locationData.lat),
         longitude: parseFloat(locationData.lon),
         name: locationData.display_name.split(',')[0],
-        country: locationData.address?.country || 'Unknown'
+        country: locationData.country || 'Unknown'
       };
 
       const locationName = `${coords.name}, ${coords.country}`;
