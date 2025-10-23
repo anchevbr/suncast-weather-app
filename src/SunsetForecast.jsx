@@ -104,7 +104,7 @@ const SunsetForecast = ({ forecast, onBack, onDataLoaded }) => {
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 1.5 }}
+            transition={{ duration: 0.8 }}
             className="mt-3 sm:mt-4 pt-2"
           >
             <MinimalHistoricalSunsets
@@ -117,7 +117,7 @@ const SunsetForecast = ({ forecast, onBack, onDataLoaded }) => {
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 2.0 }}
+            transition={{ duration: 0.8 }}
             className="mt-3 sm:mt-4 pt-2"
           >
             <div className="flex flex-col lg:flex-row items-center justify-center gap-4 sm:gap-6 md:gap-8">

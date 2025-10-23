@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import LocationAutocomplete from './components/LocationAutocomplete';
 import { fetchForecastData } from './services/apiService';
 import SunsetForecast from "./SunsetForecast";
-import { Sun } from "lucide-react";
+import { Sun, Loader2 } from "lucide-react";
 
 const Home = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -12,6 +12,7 @@ const Home = () => {
   const [error, setError] = useState(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const containerRef = useRef(null);
   const rafRef = useRef(null); // RequestAnimationFrame reference for smooth updates
 
@@ -49,6 +50,8 @@ const Home = () => {
   // Auto-scroll to forecast when ALL data is loaded (2 second smooth animation)
   useEffect(() => {
     if (forecast && isDataLoaded && containerRef.current) {
+      setIsAutoScrolling(true); // Start auto-scroll state
+      
       const container = containerRef.current;
       const targetScroll = window.innerWidth;
       const startScroll = container.scrollLeft;
@@ -79,6 +82,10 @@ const Home = () => {
         
         if (animProgress < 1) {
           animationId = requestAnimationFrame(animateScroll);
+        } else {
+          // Animation completed - stop loading
+          setIsAutoScrolling(false);
+          setIsLoading(false);
         }
       };
 
@@ -122,10 +129,11 @@ const Home = () => {
 
       setForecast(newForecast);
       setIsDataLoaded(false); // Reset for new location
+      // Keep loading until ALL data is loaded (forecast + historical)
+      // setIsLoading(false) will be called when onDataLoaded is triggered
     } catch (error) {
       setError('Unable to fetch forecast data. Please try again.');
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Stop loading on error
     }
   };
 
@@ -177,10 +185,11 @@ const Home = () => {
 
             setForecast(newForecast);
             setIsDataLoaded(false); // Reset for new location
+            // Keep loading until ALL data is loaded (forecast + historical)
+            // setIsLoading(false) will be called when onDataLoaded is triggered
           } catch (error) {
             setError('Unable to fetch forecast data. Please try again.');
-          } finally {
-            setIsLoading(false);
+            setIsLoading(false); // Stop loading on error
           }
         },
         (error) => {
@@ -312,11 +321,22 @@ const Home = () => {
                   className="flex items-center space-x-1 sm:space-x-2 hover:text-white transition-colors duration-200 disabled:opacity-50"
                   aria-label="Use current location"
                 >
-                  <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span>Use current location</span>
+                  {isLoading ? (
+                    <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                  ) : (
+                    <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
+                  )}
+                  <span>{isLoading ? 'Getting location...' : 'Use current location'}</span>
                 </button>
               </div>
             </div>
+
+            {isLoading && (
+              <div className="mt-3 flex items-center justify-center space-x-2 text-white/60">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-xs">Loading...</span>
+              </div>
+            )}
 
             {error && (
               <div 
@@ -409,7 +429,10 @@ const Home = () => {
             <SunsetForecast 
               forecast={forecast} 
               onBack={handleBackToSearch}
-              onDataLoaded={() => setIsDataLoaded(true)} 
+              onDataLoaded={() => {
+                setIsDataLoaded(true);
+                // Loading will stop when auto-scroll animation completes
+              }} 
             />
           </div>
         )}

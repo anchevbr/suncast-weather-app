@@ -58,7 +58,6 @@ const MinimalHistoricalSunsets = ({
                   transition={{
                     duration: 1.2,
                     repeat: Infinity,
-                    delay: i * 0.1,
                     ease: "easeInOut"
                   }}
                   className="w-4 h-12 bg-gradient-to-t from-orange-400 to-pink-400 rounded"
@@ -94,7 +93,7 @@ const MinimalHistoricalSunsets = ({
                         key={sunset.date}
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.1 }}
+                        transition={{ duration: 0.3 }}
                         className="flex flex-col items-center space-y-0.5 sm:space-y-1 px-0.5 sm:px-1"
                       >
                         {/* Circle row - exact h-7/h-8 to match background bar, using flex to center */}

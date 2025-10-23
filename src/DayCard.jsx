@@ -13,7 +13,6 @@ const DayCard = ({ day, index }) => {
       initial={{ y: 50, scale: 0.9 }}
       animate={{ y: 0, scale: 1 }}
       transition={{ 
-        delay: index * 0.1,
         duration: 0.6,
         ease: "easeOut"
       }}
