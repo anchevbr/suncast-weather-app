@@ -12,7 +12,10 @@ const SunsetForecast = ({ forecast, onBack, onDataLoaded }) => {
   const [isLoadingHistorical, setIsLoadingHistorical] = useState(true);
 
   // Auto-load historical data when component mounts
+  // Only run once when forecast changes (not on every render)
   useEffect(() => {
+    let isCancelled = false; // Prevent state updates if component unmounts
+    
     const loadHistoricalData = async () => {
       try {
         const location = {
@@ -26,25 +29,33 @@ const SunsetForecast = ({ forecast, onBack, onDataLoaded }) => {
           () => {} // Ignore progress updates
         );
         
-        setHistoricalData(data);
-        setIsLoadingHistorical(false);
-        
-        // Notify parent that data is loaded
-        if (onDataLoaded) {
-          onDataLoaded();
+        if (!isCancelled) {
+          setHistoricalData(data);
+          setIsLoadingHistorical(false);
+          
+          // Notify parent that data is loaded
+          if (onDataLoaded) {
+            onDataLoaded();
+          }
         }
       } catch (error) {
-        setIsLoadingHistorical(false);
-        
-        // Still notify parent even on error
-        if (onDataLoaded) {
-          onDataLoaded();
+        if (!isCancelled) {
+          setIsLoadingHistorical(false);
+          
+          // Still notify parent even on error
+          if (onDataLoaded) {
+            onDataLoaded();
+          }
         }
       }
     };
 
     loadHistoricalData();
-  }, [forecast.location, forecast.latitude, forecast.longitude, onDataLoaded]);
+    
+    return () => {
+      isCancelled = true; // Cleanup: cancel if component unmounts
+    };
+  }, [forecast.location, forecast.latitude, forecast.longitude]); // Removed onDataLoaded from deps!
 
 
   return (
