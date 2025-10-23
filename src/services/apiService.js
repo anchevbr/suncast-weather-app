@@ -28,12 +28,16 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
   }
 
   // Step 2: Fetch from Open-Meteo API directly
+  // Add API key if using Open-Meteo Commercial (set in environment variable)
+  const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
+  const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
+  
   const url = `https://api.open-meteo.com/v1/forecast?` +
     `latitude=${coords.latitude}&` +
     `longitude=${coords.longitude}&` +
     `daily=weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise&` +
     `hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,visibility,wind_speed_10m&` +
-    `timezone=auto`;
+    `timezone=auto${apiKeyParam}`;
   
   const response = await fetch(url, {
     method: 'GET',
@@ -158,6 +162,10 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
   const year = new Date().getFullYear();
   const today = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
   
+  // Add API key if using Open-Meteo Commercial (set in environment variable)
+  const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
+  const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
+  
   const url = `https://archive-api.open-meteo.com/v1/archive?` +
     `latitude=${latitude}&` +
     `longitude=${longitude}&` +
@@ -165,7 +173,7 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
     `end_date=${today}&` +
     `hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,visibility,wind_speed_10m&` +
     `daily=weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise&` +
-    `timezone=auto`;
+    `timezone=auto${apiKeyParam}`;
   
   const response = await fetch(url, {
     method: 'GET',
@@ -197,13 +205,17 @@ export const fetchHistoricalAirQualityData = async (latitude, longitude) => {
   const startDate = `${year}-01-01`;
   const endDate = new Date().toISOString().split('T')[0]; // Today's date
   
+  // Add API key if using Open-Meteo Commercial (set in environment variable)
+  const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
+  const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
+  
   const url = `https://air-quality-api.open-meteo.com/v1/air-quality?` +
     `latitude=${latitude}&` +
     `longitude=${longitude}&` +
     `start_date=${startDate}&` +
     `end_date=${endDate}&` +
     `hourly=us_aqi&` +
-    `timezone=auto`;
+    `timezone=auto${apiKeyParam}`;
   
   const response = await fetch(url);
   
