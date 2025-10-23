@@ -16,10 +16,10 @@ export const fetchHistoricalForecast = async (location) => {
   
   try {
     // Fetch historical weather data
-    const weatherData = await fetchHistoricalWeatherData(location.latitude, location.longitude, year);
+    const weatherData = await fetchHistoricalWeatherData(location.latitude, location.longitude);
     
     // Fetch historical air quality data (optional)
-    const aqiData = await fetchHistoricalAirQualityData(location.latitude, location.longitude, year);
+    const aqiData = await fetchHistoricalAirQualityData(location.latitude, location.longitude);
     
     // Process the data to get daily sunset scores
     const processedData = processHistoricalSunsetData(weatherData, aqiData, location, year);
@@ -57,11 +57,11 @@ export const fetchHistoricalForecastWithProgress = async (location, onProgress) 
     
     // Progress: Fetching weather data
     onProgress({ stage: 'fetching_weather', progress: 25 });
-    const weatherData = await fetchHistoricalWeatherData(location.latitude, location.longitude, year);
+    const weatherData = await fetchHistoricalWeatherData(location.latitude, location.longitude);
     
     // Progress: Fetching air quality data
     onProgress({ stage: 'fetching_aqi', progress: 50 });
-    const aqiData = await fetchHistoricalAirQualityData(location.latitude, location.longitude, year);
+    const aqiData = await fetchHistoricalAirQualityData(location.latitude, location.longitude);
     
     // Progress: Processing data
     onProgress({ stage: 'processing_data', progress: 75 });
