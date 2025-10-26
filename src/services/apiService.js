@@ -3,6 +3,8 @@
  * No caching - direct API calls only
  */
 
+import { getForecastUrl, getAirQualityUrl, API_CONFIG } from '../config/api.js';
+
 /**
  * Fetch live forecast data from Open-Meteo API
  * @param {string} locationQuery - Location name or coordinates
@@ -33,9 +35,7 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
   const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
   
   // Use customer API URL if API key is provided
-  const baseUrl = apiKey 
-    ? 'https://customer-api.open-meteo.com/v1/forecast'
-    : 'https://api.open-meteo.com/v1/forecast';
+  const baseUrl = getForecastUrl(apiKey);
   
   const url = `${baseUrl}?` +
     `latitude=${coords.latitude}&` +
@@ -175,7 +175,7 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
   const apiKey = ''; // Not using API key for historical data (not included in plan)
   const apiKeyParam = '';
   
-  const url = `https://archive-api.open-meteo.com/v1/archive?` +
+  const url = `${API_CONFIG.OPEN_METEO.ARCHIVE}?` +
     `latitude=${latitude}&` +
     `longitude=${longitude}&` +
     `start_date=${year}-01-01&` +
@@ -219,9 +219,7 @@ export const fetchHistoricalAirQualityData = async (latitude, longitude) => {
   const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
   
   // Use customer API URL if API key is provided
-  const baseUrl = apiKey 
-    ? 'https://customer-air-quality-api.open-meteo.com/v1/air-quality'
-    : 'https://air-quality-api.open-meteo.com/v1/air-quality';
+  const baseUrl = getAirQualityUrl(apiKey);
   
   const url = `${baseUrl}?` +
     `latitude=${latitude}&` +

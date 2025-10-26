@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
 import { Button } from "./components/ui/button";
 import { ArrowUp } from "lucide-react";
-import { motion } from "framer-motion";
 import DayCard from "./DayCard";
 import MinimalHistoricalSunsets from "./components/MinimalHistoricalSunsets";
 import { fetchHistoricalForecastWithProgress } from "./services/historicalService.js";
 
-const SunsetForecast = ({ forecast, onBack, onDataLoaded }) => {
+const SunsetForecast = memo(({ forecast, scrollProgress, onBack, onDataLoaded }) => {
   const [historicalData, setHistoricalData] = useState(null);
   const [isLoadingHistorical, setIsLoadingHistorical] = useState(true);
 
@@ -61,12 +60,7 @@ const SunsetForecast = ({ forecast, onBack, onDataLoaded }) => {
     <div className="relative w-full h-screen overflow-y-auto overflow-x-hidden">
       <div className="relative z-40 flex flex-col items-center justify-start p-3 sm:p-4 md:p-6 lg:p-8 pt-3 sm:pt-4 min-h-screen">
         {/* Back to Search - No background */}
-        <motion.div
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 1.2 }}
-          className="mb-2"
-        >
+        <div className="mb-2">
           <Button
             onClick={onBack}
             className="bg-transparent hover:bg-transparent text-white/90 hover:text-white font-thin transition-all border-none shadow-none flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm p-0"
@@ -74,51 +68,36 @@ const SunsetForecast = ({ forecast, onBack, onDataLoaded }) => {
             <ArrowUp className="w-3 h-3 rotate-[-90deg]" aria-hidden="true" />
             <span>Back to Search</span>
           </Button>
-        </motion.div>
+        </div>
 
         <div className="w-full max-w-7xl space-y-3 sm:space-y-4 backdrop-blur-xl bg-black/30 rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-6 lg:p-8 shadow-2xl border border-white/20">
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 1.2 }}
-            className="text-center"
-          >
+          <div className="text-center">
             <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold text-white drop-shadow-lg">
               {forecast.location}
             </h2>
-          </motion.div>
-
-          {/* 7-Day Forecast */}
-          <div 
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-2 sm:gap-3 md:gap-4 relative z-10"
-            role="list"
-            aria-label="7-day sunset forecast"
-          >
-            {forecast.days.map((day, index) => (
-              <DayCard key={index} day={day} index={index} />
-            ))}
           </div>
 
+                   {/* 7-Day Forecast */}
+                    <div
+                      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-2 sm:gap-3 md:gap-4 relative z-10"
+                      role="list"
+                      aria-label="7-day sunset forecast"
+                    >
+                    {forecast.days.map((day, index) => (
+                      <DayCard key={index} day={day} index={index} />
+                    ))}
+                  </div>
+
           {/* Historical Sunsets - Fixed height to prevent layout shift */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            className="mt-3 sm:mt-4 pt-2"
-          >
+          <div className="mt-3 sm:mt-4 pt-2">
             <MinimalHistoricalSunsets
               historicalData={historicalData}
               isLoading={isLoadingHistorical}
             />
-          </motion.div>
+          </div>
 
           {/* Scoring System & Weather Explanation - Now on bottom */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            className="mt-3 sm:mt-4 pt-2"
-          >
+          <div className="mt-3 sm:mt-4 pt-2">
             <div className="flex flex-col lg:flex-row items-center justify-center gap-4 sm:gap-6 md:gap-8">
               {/* Scoring System */}
               <div className="flex flex-col items-center">
@@ -156,11 +135,13 @@ const SunsetForecast = ({ forecast, onBack, onDataLoaded }) => {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>
   );
-};
+});
+
+SunsetForecast.displayName = 'SunsetForecast';
 
 export default SunsetForecast;

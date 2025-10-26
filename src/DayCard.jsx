@@ -1,25 +1,18 @@
-import React from "react";
+import React, { memo } from "react";
 import { Card } from "./components/ui/card";
 import { Sun } from "lucide-react";
-import { motion } from "framer-motion";
 import WeatherIcon from "./components/weather/WeatherIcon";
 import { getScoreColors } from "./utils/colorPalette";
 
-const DayCard = ({ day, index }) => {
+const DayCard = memo(({ day, index }) => {
   const scoreColors = getScoreColors(day.sunset_score);
 
   return (
-    <motion.div
-      initial={{ y: 50, scale: 0.9 }}
-      animate={{ y: 0, scale: 1 }}
-      transition={{ 
-        duration: 0.6,
-        ease: "easeOut"
-      }}
+    <div
       role="listitem"
       className="relative z-10"
     >
-      <Card className="relative bg-white/60 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-shadow rounded-xl sm:rounded-2xl overflow-hidden">
+      <Card className="relative bg-white/60 backdrop-blur-sm border-0 shadow-lg rounded-xl sm:rounded-2xl overflow-hidden">
         <div className="p-2 sm:p-3 flex flex-col items-center space-y-1.5 sm:space-y-2">
           {/* Date Header - More Compact */}
           <div className="text-center pb-1 border-b border-gray-200 min-h-[32px] sm:min-h-[40px] flex flex-col justify-center w-full">
@@ -60,8 +53,10 @@ const DayCard = ({ day, index }) => {
           </div>
         </div>
       </Card>
-    </motion.div>
+    </div>
   );
-};
+});
+
+DayCard.displayName = 'DayCard';
 
 export default DayCard;

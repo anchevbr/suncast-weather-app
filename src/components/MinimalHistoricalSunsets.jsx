@@ -1,8 +1,11 @@
-import React from "react";
+import React, { memo } from "react";
 import { motion } from "framer-motion";
 import { getHistoricalColors } from "../utils/colorPalette";
 
-const MinimalHistoricalSunsets = ({
+// Static array for loading animation bars
+const LOADING_BARS = Array.from({ length: 10 }, (_, i) => i);
+
+const MinimalHistoricalSunsets = memo(({
   historicalData,
   isLoading
 }) => {
@@ -47,7 +50,7 @@ const MinimalHistoricalSunsets = ({
           >
             {/* Animated Progress Bars (decorative) - Smaller and centered */}
             <div className="flex space-x-1 items-center">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+              {LOADING_BARS.map((i) => (
                 <motion.div
                   key={i}
                   animate={{
@@ -116,6 +119,8 @@ const MinimalHistoricalSunsets = ({
       </div>
     </div>
   );
-};
+});
+
+MinimalHistoricalSunsets.displayName = 'MinimalHistoricalSunsets';
 
 export default MinimalHistoricalSunsets;

@@ -1,4 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { API_CONFIG } from '../config/api.js';
+import { GEOCODING_CONSTANTS } from '../constants/app.js';
+import { ERROR_MESSAGES } from '../constants/errors.js';
 
 /**
  * Professional geocoding hook with proper state management
@@ -8,7 +11,6 @@ export const useGeocoding = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedLocation, setSelectedLocation] = useState(null);
   
   // Refs for stable references
   const debounceTimeoutRef = useRef(null);
@@ -29,7 +31,7 @@ export const useGeocoding = () => {
     }
 
     // Minimum query length
-    if (query.length < 3) {
+    if (query.length < GEOCODING_CONSTANTS.MIN_SEARCH_QUERY_LENGTH) {
       setSuggestions([]);
       setError(null);
       return;
@@ -48,16 +50,16 @@ export const useGeocoding = () => {
         const mapboxToken = import.meta.env.VITE_MAPBOX_API_KEY;
         
         if (!mapboxToken) {
-          throw new Error('Mapbox API key not found. Please add VITE_MAPBOX_API_KEY to your .env file');
+          throw new Error(ERROR_MESSAGES.MAPBOX_API_KEY_MISSING);
         }
 
         // Mapbox Geocoding API - Forward Geocoding with Autocomplete
         // Use global search without proximity bias for fair results
         const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+          `${API_CONFIG.MAPBOX.GEOCODING_BASE}/${encodeURIComponent(query)}.json?` +
           `access_token=${mapboxToken}&` +
           `types=place&` + // Only cities and towns (removes neighborhoods/POIs)
-          `limit=8&` +
+          `limit=${GEOCODING_CONSTANTS.MAX_SUGGESTIONS}&` +
           `autocomplete=true&` + // Enable autocomplete suggestions
           `language=en`,
           {
@@ -69,7 +71,7 @@ export const useGeocoding = () => {
         );
 
         if (!response.ok) {
-          throw new Error('Geocoding request failed');
+          throw new Error(ERROR_MESSAGES.GEOCODING_REQUEST_FAILED);
         }
 
         const data = await response.json();
@@ -115,19 +117,18 @@ export const useGeocoding = () => {
         setSuggestions(convertedResults);
         } catch (error) {
           if (error.name !== 'AbortError') {
-            setError('Unable to fetch location suggestions');
+            setError(ERROR_MESSAGES.GEOCODING_FAILED);
           }
         } finally {
         setIsLoading(false);
       }
-    }, 300); // Professional debounce timing
+    }, GEOCODING_CONSTANTS.DEBOUNCE_DELAY_MS);
   }, []);
 
   /**
    * Select a location from suggestions
    */
   const selectLocation = useCallback((location) => {
-    setSelectedLocation(location);
     setSuggestions([]);
     setError(null);
   }, []);
@@ -137,7 +138,6 @@ export const useGeocoding = () => {
    */
   const clearAll = useCallback(() => {
     setSuggestions([]);
-    setSelectedLocation(null);
     setError(null);
     setIsLoading(false);
   }, []);
@@ -160,7 +160,6 @@ export const useGeocoding = () => {
     suggestions,
     isLoading,
     error,
-    selectedLocation,
     fetchSuggestions,
     selectLocation,
     clearAll

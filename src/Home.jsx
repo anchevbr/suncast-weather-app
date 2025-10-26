@@ -1,10 +1,21 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { MapPin } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import LocationAutocomplete from './components/LocationAutocomplete';
 import { fetchForecastData } from './services/apiService';
 import SunsetForecast from "./SunsetForecast";
-import { Loader2 } from "lucide-react";
+import Sun from './components/scene/Sun';
+import Mountains from './components/scene/Mountains';
+import { getBackgroundGradient } from './utils/backgroundGradient';
+import { reverseGeocode } from './utils/geocoding';
+import { ERROR_MESSAGES } from './constants/errors';
+
+// Animation timing constants
+const ANIMATION_CONSTANTS = {
+  SCROLL_DURATION: 3000,      // 5 seconds for auto-scroll animation
+  START_DELAY: 100,           // Delay before starting animation
+  SNAP_BACK_DELAY: 1000,      // Delay to prevent scroll snap-back
+};
 
 const Home = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -15,50 +26,6 @@ const Home = () => {
   const containerRef = useRef(null);
   const rafRef = useRef(null); // RequestAnimationFrame reference for smooth updates
   const isAutoScrollingRef = useRef(false); // Track if auto-scroll is active (using ref to avoid closure issues)
-  
-  // Generate random cloud positions once on mount (stable across renders)
-  const cloudsRef = useRef(null);
-  if (!cloudsRef.current) {
-    // Seeded random for organic but consistent placement
-    const generateClouds = (count) => {
-      const clouds = [];
-      for (let i = 0; i < count; i++) {
-        clouds.push({
-          top: 15 + Math.random() * 45, // 15-60% from top
-          left: Math.random() * 95, // 0-95% from left (leave room for cloud width)
-          blur: 15 + Math.random() * 8, // 15-23px blur (less blur = more visible)
-          opacity: 0.25 + Math.random() * 0.15, // 0.25-0.40 opacity (much more visible!)
-          size: {
-            w: 150 + Math.random() * 180, // 150-330px width (bigger clouds)
-            h: 50 + Math.random() * 70 // 50-120px height (taller clouds)
-          },
-          circles: [
-            {
-              left: `${Math.random() * 5}%`,
-              top: `${35 + Math.random() * 15}%`,
-              width: `${36 + Math.random() * 8}%`,
-              height: `${54 + Math.random() * 12}%`
-            },
-            {
-              left: `${20 + Math.random() * 10}%`,
-              top: `${15 + Math.random() * 15}%`,
-              width: `${44 + Math.random() * 12}%`,
-              height: `${64 + Math.random() * 16}%`
-            },
-            {
-              left: `${45 + Math.random() * 10}%`,
-              top: `${30 + Math.random() * 15}%`,
-              width: `${38 + Math.random() * 10}%`,
-              height: `${58 + Math.random() * 14}%`
-            }
-          ]
-        });
-      }
-      return clouds;
-    };
-    
-    cloudsRef.current = generateClouds(18); // 18 random clouds
-  }
 
   // Track horizontal scroll - update progress ONLY for manual scrolling
   useEffect(() => {
@@ -81,6 +48,11 @@ const Home = () => {
           const progress = maxScroll > 0 ? scrollLeft / maxScroll : 0;
           
           setScrollProgress(progress);
+          
+          // Ensure scroll snap is enabled for manual scrolling
+          if (containerRef.current && containerRef.current.style.scrollSnapType !== 'x mandatory') {
+            containerRef.current.style.scrollSnapType = 'x mandatory';
+          }
         }
       });
     };
@@ -98,57 +70,80 @@ const Home = () => {
   }, []); // Empty deps - only set up once, uses ref to check auto-scroll state
 
   // Auto-scroll to forecast when ALL data is loaded (5 second smooth animation)
+  // OPTIMIZED: Throttle state updates to reduce re-renders
   useEffect(() => {
     if (forecast && isDataLoaded && containerRef.current) {
+      let animationId = null; // Move to useEffect scope so cleanup can access it
       
-      const container = containerRef.current;
-      const targetScroll = window.innerWidth;
-      const startScroll = container.scrollLeft;
-      const distance = targetScroll - startScroll;
-      const duration = 5000; // 5 seconds for smooth After Effects-style animation
-      let startTime = null;
-      let animationId = null;
+      // Small delay to ensure DOM is ready and forecast section is positioned
+      const startAnimation = () => {
+        const container = containerRef.current;
+        const targetScroll = window.innerWidth; // Scroll one viewport width to the right
+        const startScroll = container.scrollLeft;
+        const distance = targetScroll - startScroll;
+        
+        const duration = ANIMATION_CONSTANTS.SCROLL_DURATION;
+        let startTime = null;
 
-      // Enable auto-scroll mode (using ref to avoid re-renders)
-      isAutoScrollingRef.current = true;
+        // Enable auto-scroll mode (using ref to avoid re-renders)
+        isAutoScrollingRef.current = true;
+        
+        // Temporarily disable scroll snap during animation
+        disableScrollSnap();
 
-      const animateScroll = (currentTime) => {
-        // Start timer on first actual scroll movement, not on first frame call
-        if (!startTime) {
-          startTime = currentTime;
-          // First frame just initializes, actual movement starts next frame
-          animationId = requestAnimationFrame(animateScroll);
-          return;
-        }
-        
-        const timeElapsed = currentTime - startTime;
-        const animProgress = Math.min(timeElapsed / duration, 1);
-        
-        // After Effects-style smooth ease-in-ease-out curve
-        const easeInOutCubic = animProgress < 0.5
-          ? 4 * animProgress * animProgress * animProgress
-          : 1 - Math.pow(-2 * animProgress + 2, 3) / 2;
-        
-        // Update scroll position
-        const newScrollLeft = startScroll + distance * easeInOutCubic;
-        container.scrollLeft = newScrollLeft;
-        
-        // Update scrollProgress to drive all visual effects (sun, background, blur)
-        setScrollProgress(easeInOutCubic);
-        
-        if (animProgress < 1) {
-          animationId = requestAnimationFrame(animateScroll);
-        } else {
-          // Animation completed - disable auto-scroll mode and stop loading
-          isAutoScrollingRef.current = false;
-          setIsLoading(false);
-        }
+        const animateScroll = (currentTime) => {
+          // Start timer on first actual scroll movement, not on first frame call
+          if (!startTime) {
+            startTime = currentTime;
+            // First frame just initializes, actual movement starts next frame
+            animationId = requestAnimationFrame(animateScroll);
+            return;
+          }
+          
+          const timeElapsed = currentTime - startTime;
+          const animProgress = Math.min(timeElapsed / duration, 1);
+          
+          // After Effects-style smooth ease-in-ease-out curve
+          const easeInOutCubic = animProgress < 0.5
+            ? 4 * animProgress * animProgress * animProgress
+            : 1 - Math.pow(-2 * animProgress + 2, 3) / 2;
+          
+          // Update scroll position EVERY frame for perfect smoothness
+          const newScrollLeft = startScroll + distance * easeInOutCubic;
+          container.scrollLeft = newScrollLeft;
+          
+          
+          // Calculate scrollProgress the SAME WAY as manual scroll
+          const maxScroll = container.scrollWidth - container.clientWidth;
+          const progress = maxScroll > 0 ? newScrollLeft / maxScroll : 0;
+          setScrollProgress(progress);
+          
+          
+          if (animProgress < 1) {
+            animationId = requestAnimationFrame(animateScroll);
+          } else {
+            // Animation completed - disable auto-scroll mode and stop loading
+            // Re-enable scroll snap after animation
+            enableScrollSnap();
+            
+            // Add longer delay to prevent scroll snap-back events
+            setTimeout(() => {
+              isAutoScrollingRef.current = false;
+            }, ANIMATION_CONSTANTS.SNAP_BACK_DELAY);
+            
+            setIsLoading(false);
+          }
+        };
+
+        // Start the animation
+        animationId = requestAnimationFrame(animateScroll);
       };
 
-      // Start immediately when data is loaded
-      animationId = requestAnimationFrame(animateScroll);
+      // Small delay to ensure DOM is ready
+      const timeoutId = setTimeout(startAnimation, ANIMATION_CONSTANTS.START_DELAY);
 
-      return () => {
+    return () => {
+        clearTimeout(timeoutId);
         if (animationId) {
           cancelAnimationFrame(animationId);
         }
@@ -157,12 +152,28 @@ const Home = () => {
     }
   }, [forecast, isDataLoaded]);
 
+  // Helper functions for scroll snap management
+  const enableScrollSnap = useCallback(() => {
+    if (containerRef.current) {
+      containerRef.current.style.scrollSnapType = 'x mandatory';
+    }
+  }, []);
+
+  const disableScrollSnap = useCallback(() => {
+    if (containerRef.current) {
+      containerRef.current.style.scrollSnapType = 'none';
+    }
+  }, []);
+
   /**
    * Handle location selection from autocomplete
    */
   const handleLocationSelect = async (locationData) => {
     setIsLoading(true);
     setError(null);
+    
+    // Ensure scroll snap is enabled for new search
+    enableScrollSnap();
 
     try {
       // Use coordinates directly from the selected location
@@ -189,7 +200,7 @@ const Home = () => {
       // Keep loading until ALL data is loaded (forecast + historical)
       // setIsLoading(false) will be called when onDataLoaded is triggered
     } catch (error) {
-      setError('Unable to fetch forecast data. Please try again.');
+      setError(ERROR_MESSAGES.FORECAST_FETCH_FAILED);
       setIsLoading(false); // Stop loading on error
     }
   };
@@ -199,38 +210,16 @@ const Home = () => {
   const handleGetCurrentLocation = () => {
     if (navigator.geolocation) {
       setIsLoading(true);
+      
+      // Ensure scroll snap is enabled for new search
+      enableScrollSnap();
+      
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
           
           try {
-            // First, get the city name from coordinates using reverse geocoding
-            const geocodingResponse = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=18&email=your-email@example.com`
-            );
-            
-            if (!geocodingResponse.ok) {
-              throw new Error('Failed to get location name');
-            }
-            
-            const locationData = await geocodingResponse.json();
-            
-            // Extract city name more reliably
-            let cityName = 'Unknown Location';
-            let countryName = '';
-            
-            if (locationData.address) {
-              const addr = locationData.address;
-              cityName = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb || addr.county || 'Unknown';
-              countryName = addr.country || '';
-            } else if (locationData.display_name) {
-              // Fallback to parsing display_name
-              const parts = locationData.display_name.split(',');
-              cityName = parts[0].trim();
-              countryName = parts[parts.length - 1].trim();
-            }
-
-            const locationName = countryName ? `${cityName}, ${countryName}` : cityName;
+            const locationName = await reverseGeocode(latitude, longitude);
             const forecastData = await fetchForecastData(`${latitude}, ${longitude}`, locationName);
             
             const newForecast = {
@@ -241,133 +230,89 @@ const Home = () => {
             };
 
             setForecast(newForecast);
-            setIsDataLoaded(false); // Reset for new location
-            // Keep loading until ALL data is loaded (forecast + historical)
-            // setIsLoading(false) will be called when onDataLoaded is triggered
+            setIsDataLoaded(false);
           } catch (error) {
-            setError('Unable to fetch forecast data. Please try again.');
-            setIsLoading(false); // Stop loading on error
+            setError(ERROR_MESSAGES.FORECAST_FETCH_FAILED);
+            setIsLoading(false);
           }
         },
         (error) => {
-          setError("Unable to get your location. Please search manually.");
+          setError(ERROR_MESSAGES.LOCATION_PERMISSION_DENIED);
           setIsLoading(false);
         }
       );
     } else {
-      setError("Geolocation is not supported by your browser.");
+      setError(ERROR_MESSAGES.LOCATION_NOT_SUPPORTED);
     }
   };
 
-  const handleBackToSearch = () => {
+  const handleBackToSearch = useCallback(() => {
     if (containerRef.current) {
+      // Re-enable scroll snap for smooth back navigation
+      enableScrollSnap();
+      
       containerRef.current.scrollTo({
         left: 0,
         behavior: 'smooth'
       });
     }
-  };
+    isAutoScrollingRef.current = false;
+  }, [enableScrollSnap]);
 
-  // Calculate gradient colors based on scroll progress
-  const getBackgroundGradient = () => {
-    // Daylight colors (0% scroll)
-    const daylight = {
-      top: '#4a90e2',
-      mid1: '#5fa3e8',
-      mid2: '#7ab8ee',
-      bottom: '#a4d4f4'
-    };
-    
-    // Sunset colors (100% scroll)
-    const sunset = {
-      top: '#1a1a2e',
-      mid1: '#d4507a',
-      mid2: '#ff8c42',
-      bottom: '#ffb347'
-    };
+  // Memoized callback for onDataLoaded to prevent re-renders
+  const handleDataLoaded = useCallback(() => {
+    setIsDataLoaded(true);
+  }, []);
 
-    // Interpolate colors
-    const interpolate = (color1, color2, factor) => {
-      const hex1 = color1.replace('#', '');
-      const hex2 = color2.replace('#', '');
-      const r1 = parseInt(hex1.substring(0, 2), 16);
-      const g1 = parseInt(hex1.substring(2, 4), 16);
-      const b1 = parseInt(hex1.substring(4, 6), 16);
-      const r2 = parseInt(hex2.substring(0, 2), 16);
-      const g2 = parseInt(hex2.substring(2, 4), 16);
-      const b2 = parseInt(hex2.substring(4, 6), 16);
-      const r = Math.round(r1 + (r2 - r1) * factor);
-      const g = Math.round(g1 + (g2 - g1) * factor);
-      const b = Math.round(b1 + (b2 - b1) * factor);
-      return `rgb(${r}, ${g}, ${b})`;
-    };
-
-    const topColor = interpolate(daylight.top, sunset.top, scrollProgress);
-    const mid1Color = interpolate(daylight.mid1, sunset.mid1, scrollProgress);
-    const mid2Color = interpolate(daylight.mid2, sunset.mid2, scrollProgress);
-    const bottomColor = interpolate(daylight.bottom, sunset.bottom, scrollProgress);
-
-    return `linear-gradient(to bottom, ${topColor} 0%, ${mid1Color} 33%, ${mid2Color} 66%, ${bottomColor} 100%)`;
-  };
+  // Memoize background gradient calculation (only recalculate when scrollProgress changes)
+  const backgroundGradient = useMemo(() => {
+    return getBackgroundGradient(scrollProgress);
+  }, [scrollProgress]);
 
   return (
-      <div 
+    <div 
       ref={containerRef}
-      className="relative h-screen overflow-x-auto overflow-y-hidden flex"
+      className="relative h-screen overflow-x-auto overflow-y-hidden flex horizontal-scroll-container"
       style={{ 
-        scrollBehavior: 'smooth',
         scrollSnapType: 'x mandatory',
-        background: getBackgroundGradient(),
+        background: backgroundGradient,
         willChange: 'background',
         margin: 0,
         padding: 0
       }}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-        
-        /* Custom scrollbar for horizontal scroll */
-        .relative.h-screen.overflow-x-auto::-webkit-scrollbar {
-          height: 8px;
-        }
-        .relative.h-screen.overflow-x-auto::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.1);
-        }
-        .relative.h-screen.overflow-x-auto::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.3);
-          border-radius: 4px;
-        }
-        .relative.h-screen.overflow-x-auto::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.5);
-        }
-        
-        body {
-          overscroll-behavior: none;
-        }
-      `}</style>
 
-      {/* Hero Section */}
+      {/* Hero Section - OPTIMIZED: Use CSS variables for better performance */}
       <div 
         className="min-w-full h-screen flex items-center justify-center relative overflow-hidden snap-start flex-shrink-0"
         style={{ 
-          // Smooth blur transition: 0px at 0%, gradually to 15px at 10%, stay at 15px until 100%
+          // Smooth blur transition: 0px at 0%, gradually to 15px at 10%, then fade back to 0px
           // Using exponential curve for more natural fade
-          filter: `blur(${scrollProgress <= 0.1 ? scrollProgress * 150 : 15}px)`
+          filter: `blur(${scrollProgress <= 0.1 ? scrollProgress * 150 : Math.max(0, 15 - (scrollProgress - 0.1) * 150)}px)`,
+          willChange: 'filter' // GPU acceleration hint
         }}
       >
         <div className="p-4 sm:p-6 md:p-8 lg:p-10 z-40 relative w-full max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            animate={{ 
+              opacity: Math.max(0, 1 - scrollProgress * 10),
+              y: 0 
+            }}
+            transition={{ duration: 0, ease: "linear" }}
             className="w-full max-w-xl mx-auto text-center space-y-6 sm:space-y-8 md:space-y-10"
           >
             <div className="space-y-4 sm:space-y-6">
               <div className="text-center space-y-2">
-                      <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-wide bg-gradient-to-r from-blue-800 via-yellow-600 to-orange-700 bg-clip-text text-transparent" style={{ animation: 'pulse 4s ease-in-out infinite', letterSpacing: '-0.02em' }}>
-                        Golden Hour
-                      </h1>
-                <p className="text-xs sm:text-sm md:text-base text-white/80 font-normal max-w-md mx-auto leading-relaxed px-4">
+                <h1 
+                  className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-wide bg-gradient-to-r from-orange-400 via-pink-500 to-red-500 bg-clip-text text-transparent" 
+                  style={{ letterSpacing: '-0.02em' }}
+                >
+                  Golden Hour
+                </h1>
+                <p 
+                  className="text-xs sm:text-sm md:text-base text-white/80 font-normal max-w-md mx-auto leading-relaxed px-4"
+                >
                   Will tonight's sunset be spectacular?
                 </p>
               </div>
@@ -380,24 +325,40 @@ const Home = () => {
                 placeholder="Enter location..."
               />
               
-              {!isLoading ? (
-                <div className="flex items-center justify-center space-x-2 sm:space-x-4 text-xs sm:text-sm text-white/70">
-                  <button
-                    onClick={handleGetCurrentLocation}
-                    className="flex items-center space-x-1 sm:space-x-2 hover:text-white transition-colors duration-200"
-                    aria-label="Use current location"
-                  >
-                    <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>Use current location</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center">
-                  <div className="text-sm font-medium bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent animate-pulse">
-                    Loading data...
-                  </div>
-                </div>
-              )}
+              <div className="flex items-center justify-center space-x-2 sm:space-x-4 text-xs sm:text-sm text-white/70">
+                <motion.div
+                  key={isLoading ? 'loading' : 'button'}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex items-center justify-center"
+                >
+                  {!isLoading ? (
+                    <motion.button
+                      onClick={handleGetCurrentLocation}
+                      className="flex items-center space-x-1 sm:space-x-2 hover:text-white transition-colors duration-200"
+                      aria-label="Use current location"
+                      whileHover={{ 
+                        scale: 1.05, 
+                        y: -2,
+                        transition: { type: "spring", stiffness: 400, damping: 17 }
+                      }}
+                      whileTap={{ 
+                        scale: 0.95,
+                        transition: { type: "spring", stiffness: 400, damping: 17 }
+                      }}
+                    >
+                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <span>Use current location</span>
+                    </motion.button>
+                  ) : (
+                    <div className="text-sm font-medium bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent animate-pulse">
+                      Loading data...
+                    </div>
+                  )}
+                </motion.div>
+              </div>
             </div>
 
 
@@ -412,191 +373,31 @@ const Home = () => {
             )}
           </motion.div>
         </div>
-      </div>
+        </div>
 
-      {/* Animated Sun - sets behind mountains as you scroll right (fixed position, only moves down) */}
-      <div
-        className="fixed pointer-events-none z-10"
+      {/* Animated Sun - sets behind mountains as you scroll right */}
+      <Sun scrollProgress={scrollProgress} />
+
+      {/* Mountain silhouettes - scrolls with horizontal navigation */}
+      <Mountains />
+
+      {/* Results Section - Always present in DOM for smooth scrolling */}
+      <div 
+        className="min-w-full h-screen snap-start flex-shrink-0"
         style={{
-          left: '10%',
-          top: `${20 + scrollProgress * 65}vh`,
-          opacity: 1 - scrollProgress * 0.4,
-          transition: 'none', // No CSS transitions - driven by scroll
-          willChange: 'top, opacity',
-          transform: 'translateZ(0)' // GPU acceleration
+          opacity: (forecast && isDataLoaded) ? 1 : 0,
+          pointerEvents: (forecast && isDataLoaded) ? 'auto' : 'none'
         }}
       >
-          <div className="relative" style={{ width: 'clamp(80px, 12vw, 140px)', height: 'clamp(80px, 12vw, 140px)' }}>
-            {/* Large overexposed halo - much bigger than sun, extreme feathering */}
-            <div 
-              className="absolute rounded-full"
-              style={{
-                width: 'clamp(200px, 30vw, 400px)',
-                height: 'clamp(200px, 30vw, 400px)',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                background: 'radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.5) 20%, rgba(255, 255, 255, 0.4) 40%, rgba(255, 255, 255, 0.3) 60%, rgba(255, 255, 255, 0.2) 80%, rgba(255, 255, 255, 0.1) 90%, transparent 100%)',
-                filter: 'blur(50px)',
-                zIndex: 1
-              }}
-            />
-            
-            {/* Extreme overexposed sun with no visible edge - red tint when setting */}
-            <div 
-              className="absolute inset-0 rounded-full"
-              style={{
-                background: (() => {
-                  let red, green, blue;
-                  
-                  // Sun color transition over the entire 5-second animation
-                  if (scrollProgress < 0.2) {
-                    // White sun during "day" phase (0-20%)
-                    red = 255;
-                    green = 255;
-                    blue = 255;
-                  } else {
-                    // Red transition during "sunset" phase (20-100%) - 4 seconds of transition
-                    const sunsetProgress = (scrollProgress - 0.2) / 0.8; // 0 to 1 between 20-100%
-                    red = 255; // Always full red
-                    green = Math.round(255 * (1 - sunsetProgress)); // Fade green from 255 to 0
-                    blue = Math.round(255 * (1 - sunsetProgress)); // Fade blue from 255 to 0
-                  }
-                  
-                  // Feathering transition: gradually reduce feathering from 0% to 100%
-                  // Calculate feather factor: 1.0 at start (full feather), 0.0 at 80%+ (sharp)
-                  const featherFactor = scrollProgress < 0.8 ? 1 - (scrollProgress / 0.8) : 0;
-                  
-                  // Interpolate gradient stops based on featherFactor
-                  // When featherFactor = 1: soft, feathered (many gradual stops)
-                  // When featherFactor = 0: sharp (fewer stops, higher opacity)
-                  const a10 = 1 - (0.02 * featherFactor);  // 0.98 -> 1.0
-                  const a20 = 1 - (0.05 * featherFactor);  // 0.95 -> 1.0
-                  const a30 = 1 - (0.10 * featherFactor);  // 0.9 -> 1.0
-                  const a40 = 1 - (0.20 * featherFactor);  // 0.8 -> 1.0
-                  const a50 = 0.9 - (0.20 * featherFactor); // 0.7 -> 0.9
-                  const a60 = 0.9 - (0.40 * featherFactor); // 0.5 -> 0.9
-                  const a70 = 0.6 - (0.30 * featherFactor); // 0.3 -> 0.6
-                  const a80 = 0.3 - (0.15 * featherFactor); // 0.15 -> 0.3 (but this becomes 0.2 at sharp)
-                  const a90 = 0.2 - (0.12 * featherFactor); // 0.08 -> 0.2
-                  const a95 = 0.03 - (0.03 * featherFactor); // 0.03 -> 0 (invisible at sharp)
-                  const a98 = 0.01 - (0.01 * featherFactor); // 0.01 -> 0
-                  
-                  return `radial-gradient(circle, rgba(${red}, ${green}, ${blue}, 1) 0%, rgba(${red}, ${green}, ${blue}, ${a10}) 10%, rgba(${red}, ${green}, ${blue}, ${a20}) 20%, rgba(${red}, ${green}, ${blue}, ${a30}) 30%, rgba(${red}, ${green}, ${blue}, ${a40}) 40%, rgba(${red}, ${green}, ${blue}, ${a50}) 50%, rgba(${red}, ${green}, ${blue}, ${a60}) 60%, rgba(${red}, ${green}, ${blue}, ${a70}) 70%, rgba(${red}, ${green}, ${blue}, ${a80}) 80%, rgba(${red}, ${green}, ${blue}, ${a90}) 90%, rgba(${red}, ${green}, ${blue}, ${a95}) 95%, rgba(${red}, ${green}, ${blue}, ${a98}) 98%, transparent 100%)`;
-                })(),
-                // Smooth exponential blur reduction: 8px at 0%, gradually to 0px at 80%, completely sharp at 100%
-                // Using quadratic easing for more natural transition (faster at start, slower at end)
-                // After 80% (4 seconds), transition to 0 blur for sharp sunset
-                filter: `blur(${scrollProgress < 0.8 ? 8 * Math.pow(1 - (scrollProgress / 0.8), 2) : 0}px)`,
-                zIndex: 2
-              }}
-            />
-        </div>
-      </div>
-
-      {/* Organic Random Clouds - randomly positioned on each page load, optimized for performance */}
-      <div className="fixed inset-0 pointer-events-none z-5" style={{ overflow: 'hidden', willChange: 'transform' }}>
-        {(() => {
-          // Smooth color interpolation throughout the entire scroll (0-100%)
-          // Daylight colors
-          const daylight = { r: 255, g: 255, b: 255 };
-          // Sunset colors (orange/pink)
-          const sunset = { r: 255, g: 150, b: 125 };
-          
-          // Smooth linear interpolation from daylight to sunset
-          const red = Math.round(daylight.r + (sunset.r - daylight.r) * scrollProgress);
-          const green = Math.round(daylight.g + (sunset.g - daylight.g) * scrollProgress);
-          const blue = Math.round(daylight.b + (sunset.b - daylight.b) * scrollProgress);
-          
-          // Opacity fade is more gradual
-          const fadeAmount = scrollProgress * 0.08;
-          
-          return cloudsRef.current.map((cloud, idx) => (
-            <div 
-              key={idx}
-              className="absolute" 
-              style={{ 
-                top: `${cloud.top}%`, 
-                left: `${cloud.left}%`, 
-                filter: `blur(${cloud.blur}px)`, 
-                willChange: 'opacity' 
-              }}
-            >
-              <div style={{ 
-                position: 'relative', 
-                width: `${cloud.size.w}px`, 
-                height: `${cloud.size.h}px` 
-              }}>
-                {cloud.circles.map((circle, i) => (
-                  <div 
-                    key={i}
-                    className="absolute rounded-full" 
-                    style={{ 
-                      left: circle.left, 
-                      top: circle.top, 
-                      width: circle.width, 
-                      height: circle.height, 
-                      // Smooth color transition from white to orange/pink throughout scroll
-                      background: `rgba(${red}, ${green}, ${blue}, ${Math.max(0.1, cloud.opacity - fadeAmount)})`,
-                      transform: 'translateZ(0)', // GPU acceleration
-                      transition: 'background 0.1s ease-out' // Smooth color changes between frames
-                    }} 
-                  />
-                ))}
-              </div>
-            </div>
-          ));
-        })()}
-      </div>
-
-      {/* Mountain silhouettes - scrolls with horizontal navigation, extended to cover all sections */}
-      <div className="fixed bottom-0 left-0 pointer-events-none z-30" style={{ width: '200vw', height: 'clamp(14rem, 35vh, 36rem)', transform: 'translateY(0px)' }}>
-        {/* Back mountain layer - solid */}
-        <div 
-          className="absolute bottom-0 left-0 h-full"
-          style={{
-            width: '200vw',
-            background: '#1a2332',
-            clipPath: 'polygon(0 100%, 0 70%, 5% 80%, 10% 60%, 17.5% 85%, 25% 70%, 32.5% 90%, 40% 75%, 45% 90%, 50% 70%, 55% 85%, 60% 65%, 70% 85%, 75% 75%, 82% 88%, 90% 78%, 95% 85%, 100% 72%, 100% 100%)'
-          }}
-        ></div>
-        
-        {/* Middle mountain layer - solid */}
-        <div 
-          className="absolute bottom-0 left-0 h-full"
-          style={{
-            width: '200vw',
-            background: '#0d1419',
-            clipPath: 'polygon(0 100%, 0 85%, 7.5% 95%, 15% 75%, 22.5% 90%, 30% 80%, 37.5% 95%, 45% 80%, 50% 85%, 57% 78%, 65% 92%, 72% 82%, 80% 88%, 87% 80%, 95% 90%, 100% 85%, 100% 100%)'
-          }}
-        ></div>
-        
-        {/* Front mountain layer - solid */}
-        <div 
-          className="absolute bottom-0 left-0 h-full"
-          style={{
-            width: '200vw',
-            background: '#050a0d',
-            clipPath: 'polygon(0 100%, 0 90%, 6% 98%, 12.5% 88%, 20% 95%, 27.5% 85%, 35% 92%, 42.5% 87%, 50% 90%, 57% 86%, 65% 94%, 72% 88%, 80% 93%, 87% 89%, 95% 92%, 100% 90%, 100% 100%)'
-          }}
-        ></div>
-      </div>
-
-      {/* Results Section */}
-      <AnimatePresence>
         {forecast && (
-          <div className="min-w-full h-screen snap-start flex-shrink-0">
-            <SunsetForecast 
-              forecast={forecast} 
-              onBack={handleBackToSearch}
-              onDataLoaded={() => {
-                setIsDataLoaded(true);
-                // Loading will stop when auto-scroll animation completes
-              }} 
-            />
-          </div>
+          <SunsetForecast 
+            forecast={forecast}
+            scrollProgress={scrollProgress}
+            onBack={handleBackToSearch}
+            onDataLoaded={handleDataLoaded}
+          />
         )}
-      </AnimatePresence>
+      </div>
     </div>
   );
 };

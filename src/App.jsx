@@ -1,11 +1,12 @@
 import React from 'react'
 import Home from './Home.jsx'
+import ErrorBoundary from './components/ErrorBoundary'
 
 function App() {
   return (
-    <div className="App">
+    <ErrorBoundary>
       <Home />
-    </div>
+    </ErrorBoundary>
   )
 }
 

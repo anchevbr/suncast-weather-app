@@ -4,6 +4,7 @@
  */
 
 import { getCloudTypeFromWeatherCode, getSunsetQualityScore } from './scoringService.js';
+import { SUNSET_CONSTANTS } from '../constants/app.js';
 
 /**
  * Process historical weather data to calculate sunset scores for each day
@@ -20,23 +21,23 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
   // Process each day of the year
   for (let dayIndex = 0; dayIndex < totalDays; dayIndex++) {
     const date = new Date(year, 0, dayIndex + 1);
-    const sunsetHour = 18; // Approximate sunset hour
+    const sunsetHour = SUNSET_CONSTANTS.APPROXIMATE_SUNSET_HOUR;
     const hourIndex = (dayIndex * 24) + sunsetHour;
     
     // Get weather data for sunset hour (with bounds checking)
     const safeHourIndex = Math.min(hourIndex, (weatherData.hourly?.time?.length || 0) - 1);
     
     const weatherCode = weatherData.hourly?.weather_code?.[safeHourIndex] || 0;
-    const cloudCoverage = weatherData.hourly?.cloud_cover?.[safeHourIndex] || 50;
-    const humidity = weatherData.hourly?.relative_humidity_2m?.[safeHourIndex] || 50;
+    const cloudCoverage = weatherData.hourly?.cloud_cover?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_HUMIDITY;
+    const humidity = weatherData.hourly?.relative_humidity_2m?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_HUMIDITY;
     const precipChance = weatherData.hourly?.precipitation_probability?.[safeHourIndex] || 0;
-    const visibility = weatherData.hourly?.visibility?.[safeHourIndex] || 10000;
-    const windSpeed = weatherData.hourly?.wind_speed_10m?.[safeHourIndex] || 10;
+    const visibility = weatherData.hourly?.visibility?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_VISIBILITY;
+    const windSpeed = weatherData.hourly?.wind_speed_10m?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_WIND_SPEED;
     
     // Get AQI for this hour
-    let aqi = 50; // Default moderate AQI
+    let aqi = SUNSET_CONSTANTS.DEFAULT_AQI;
     if (aqiData && aqiData.hourly && aqiData.hourly.us_aqi) {
-      aqi = aqiData.hourly.us_aqi[safeHourIndex] || 50;
+      aqi = aqiData.hourly.us_aqi[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_AQI;
     }
     
     // Get cloud type and height from weather code

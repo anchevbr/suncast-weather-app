@@ -1,12 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
 import { useGeocoding } from '../hooks/useGeocoding';
 
 /**
  * Professional Location Autocomplete Component
  * Based on industry best practices for autocomplete functionality
+ * Optimized with memo to prevent unnecessary re-renders
  */
-const LocationAutocomplete = ({ onLocationSelect, placeholder = "Search for a location..." }) => {
+const LocationAutocomplete = memo(({ onLocationSelect, placeholder = "Search for a location..." }) => {
   const [inputValue, setInputValue] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -19,7 +20,6 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Search for a lo
     suggestions,
     isLoading,
     error,
-    selectedLocation,
     fetchSuggestions,
     selectLocation,
     clearAll
@@ -27,8 +27,9 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Search for a lo
 
   /**
    * Handle input change with debounced suggestions
+   * Memoized to prevent recreation on every render
    */
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const value = e.target.value;
     setInputValue(value);
     setSelectedIndex(-1);
@@ -40,12 +41,13 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Search for a lo
       setShowSuggestions(false);
       clearAll();
     }
-  };
+  }, [fetchSuggestions, clearAll]);
 
   /**
    * Handle suggestion selection
+   * Memoized to prevent recreation on every render
    */
-  const handleSuggestionClick = (suggestion) => {
+  const handleSuggestionClick = useCallback((suggestion) => {
     setInputValue(suggestion.display_name);
     setShowSuggestions(false);
     setSelectedIndex(-1);
@@ -57,12 +59,13 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Search for a lo
     if (onLocationSelect) {
       onLocationSelect(suggestion);
     }
-  };
+  }, [selectLocation, onLocationSelect]);
 
   /**
    * Handle keyboard navigation
+   * Memoized to prevent recreation on every render
    */
-  const handleKeyDown = (e) => {
+  const handleKeyDown = useCallback((e) => {
     if (!showSuggestions || suggestions.length === 0) return;
 
     switch (e.key) {
@@ -88,7 +91,7 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Search for a lo
         inputRef.current?.blur();
         break;
     }
-  };
+  }, [showSuggestions, suggestions.length, selectedIndex, handleSuggestionClick]);
 
   /**
    * Handle click outside to close suggestions
@@ -157,7 +160,7 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Search for a lo
             <ul className="py-1">
               {suggestions.map((suggestion, index) => (
                 <li
-                  key={suggestion.place_id}
+                  key={suggestion._mapbox?.id || `${suggestion.lat}-${suggestion.lon}`}
                   onClick={() => handleSuggestionClick(suggestion)}
                   className={`px-4 py-3 cursor-pointer transition-colors duration-150 ${
                     index === selectedIndex
@@ -184,6 +187,8 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Search for a lo
       )}
     </div>
   );
-};
+});
+
+LocationAutocomplete.displayName = 'LocationAutocomplete';
 
 export default LocationAutocomplete;

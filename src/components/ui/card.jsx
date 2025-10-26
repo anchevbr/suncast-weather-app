@@ -11,4 +11,6 @@ const Card = ({ className, children, ...props }) => {
   );
 };
 
+Card.displayName = 'Card';
+
 export { Card };
