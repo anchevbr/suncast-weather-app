@@ -1,19 +1,190 @@
 /**
- * Centralized Sunset Quality Scoring Service
- * Single source of truth for all sunset scoring calculations
+ * Scientific Sunset Quality Scoring Service
+ * Based on atmospheric optics and cloud physics research
+ * Designed to cap at exactly 100 points maximum
  */
 
 /**
- * Get cloud type and height from WMO weather code
+ * Scientific sunset quality score based on atmospheric optics and cloud physics
+ * Research shows: High clouds (>8km) scatter sunlight creating vibrant colors
+ * Mid-level clouds (3-8km) provide moderate color enhancement
+ * Low clouds (0-3km) often block sunlight and reduce color intensity
+ * @param {Object} weather - Weather data object with Open-Meteo cloud cover data
+ * @returns {Object} - {score: number, conditions: string}
+ */
+export const getSunsetQualityScore = (weather) => {
+  let score = 0;
+  
+  // Extract cloud cover data by altitude (Open-Meteo provides actual measurements)
+  const cloudCoverageLow = weather.cloud_coverage_low || 0;    // 0-3km altitude
+  const cloudCoverageMid = weather.cloud_coverage_mid || 0;    // 3-8km altitude  
+  const cloudCoverageHigh = weather.cloud_coverage_high || 0;  // >8km altitude
+  
+  // Extract other meteorological factors
+  const precipChance = weather.precipitation_chance || 0;
+  const humidity = weather.humidity || 50;
+  const aqi = weather.air_quality_index || 50;
+  const visibility = weather.visibility || 10000;
+  
+  // === CLOUD ALTITUDE SCORING (50 points max) ===
+  // High clouds (>8km) are scientifically optimal for sunset colors
+  let cloudScore = 0;
+  
+  if (cloudCoverageHigh > 0) {
+    if (cloudCoverageHigh >= 25 && cloudCoverageHigh <= 50) {
+      cloudScore += 30; // Optimal high cloud coverage
+    } else if (cloudCoverageHigh >= 15 && cloudCoverageHigh < 25) {
+      cloudScore += 25; // Good high cloud coverage
+    } else if (cloudCoverageHigh >= 50 && cloudCoverageHigh <= 70) {
+      cloudScore += 20; // Heavy high clouds still good
+    } else if (cloudCoverageHigh > 70) {
+      cloudScore += 15; // Very heavy high clouds
+    } else {
+      cloudScore += 20; // Light high clouds
+    }
+  }
+  
+  // Mid-level clouds (3-8km) provide moderate color enhancement
+  if (cloudCoverageMid > 0) {
+    if (cloudCoverageMid >= 20 && cloudCoverageMid <= 40) {
+      cloudScore += 15; // Good mid-level clouds
+    } else if (cloudCoverageMid >= 10 && cloudCoverageMid < 20) {
+      cloudScore += 12; // Light mid-level clouds
+    } else if (cloudCoverageMid > 40 && cloudCoverageMid <= 60) {
+      cloudScore += 8; // Heavy mid-level clouds
+    } else {
+      cloudScore += 10; // Minimal mid-level clouds
+    }
+  }
+  
+  // Low clouds (0-3km) typically block sunlight and reduce color intensity
+  if (cloudCoverageLow > 0) {
+    if (cloudCoverageLow >= 60) {
+      cloudScore -= 20; // Heavy low clouds block sunlight
+    } else if (cloudCoverageLow >= 40 && cloudCoverageLow < 60) {
+      cloudScore -= 8; // Moderate low clouds reduce colors
+    } else if (cloudCoverageLow >= 20 && cloudCoverageLow < 40) {
+      cloudScore += 3; // Light low clouds can create silhouettes
+    } else {
+      cloudScore += 5; // Minimal low clouds, slight enhancement
+    }
+  }
+  
+  // Clear skies bonus - when all cloud levels are minimal
+  if (cloudCoverageLow < 5 && cloudCoverageMid < 5 && cloudCoverageHigh < 5) {
+    cloudScore += 10; // Crystal clear skies bonus
+  }
+  
+  // Cap cloud score at 50 points maximum
+  score += Math.min(50, Math.max(0, cloudScore));
+  
+  // === ATMOSPHERIC CONDITIONS (30 points max) ===
+  let atmosphericScore = 0;
+  
+  // Precipitation severely impacts sunset quality
+  if (precipChance >= 60) {
+    atmosphericScore -= 20; // Heavy precipitation
+  } else if (precipChance >= 40) {
+    atmosphericScore -= 12; // Moderate precipitation
+  } else if (precipChance >= 20) {
+    atmosphericScore -= 6; // Light precipitation
+  } else if (precipChance >= 5) {
+    atmosphericScore -= 2; // Slight chance of precipitation
+  }
+  
+  // Humidity affects color intensity through atmospheric scattering
+  if (humidity >= 40 && humidity <= 70) {
+    atmosphericScore += 10; // Optimal humidity
+  } else if (humidity >= 30 && humidity < 40) {
+    atmosphericScore += 8; // Lower humidity, good clarity
+  } else if (humidity >= 70 && humidity <= 85) {
+    atmosphericScore += 5; // Higher humidity, slightly muted
+  } else if (humidity > 85) {
+    atmosphericScore -= 3; // Very high humidity
+  } else if (humidity < 30) {
+    atmosphericScore += 7; // Very low humidity, excellent clarity
+  }
+  
+  // Air quality impacts color purity and visibility
+  if (aqi <= 25) {
+    atmosphericScore += 10; // Excellent air quality
+  } else if (aqi <= 50) {
+    atmosphericScore += 8; // Good air quality
+  } else if (aqi <= 75) {
+    atmosphericScore += 5; // Moderate air quality
+  } else if (aqi <= 100) {
+    atmosphericScore += 2; // Poor air quality
+  } else {
+    atmosphericScore -= 5; // Very poor air quality
+  }
+  
+  // Visibility directly affects sunset clarity
+  if (visibility >= 20000) {
+    atmosphericScore += 8; // Excellent visibility
+  } else if (visibility >= 15000) {
+    atmosphericScore += 6; // Very good visibility
+  } else if (visibility >= 10000) {
+    atmosphericScore += 4; // Good visibility
+  } else if (visibility >= 5000) {
+    atmosphericScore += 2; // Moderate visibility
+  } else if (visibility >= 2000) {
+    atmosphericScore -= 3; // Poor visibility
+  } else {
+    atmosphericScore -= 8; // Very poor visibility
+  }
+  
+  // Cap atmospheric score at 30 points maximum
+  score += Math.min(30, Math.max(-20, atmosphericScore));
+  
+  // === OPTIMAL CONDITIONS BONUS (20 points max) ===
+  let bonusScore = 0;
+  
+  // Perfect atmospheric conditions for spectacular sunsets
+  const hasOptimalHighClouds = cloudCoverageHigh >= 25 && cloudCoverageHigh <= 50;
+  const hasGoodMidClouds = cloudCoverageMid >= 10 && cloudCoverageMid <= 30;
+  const hasMinimalLowClouds = cloudCoverageLow < 20;
+  const hasLowPrecipitation = precipChance < 10;
+  const hasGoodAirQuality = aqi <= 50;
+  const hasGoodVisibility = visibility >= 15000;
+  
+  if (hasOptimalHighClouds && hasMinimalLowClouds && hasLowPrecipitation && hasGoodAirQuality && hasGoodVisibility) {
+    bonusScore += 20; // Perfect conditions bonus
+  } else if (hasOptimalHighClouds && hasMinimalLowClouds && hasLowPrecipitation) {
+    bonusScore += 12; // Very good conditions
+  } else if (hasGoodMidClouds && hasMinimalLowClouds && hasLowPrecipitation) {
+    bonusScore += 8; // Good conditions
+  }
+  
+  // Cap bonus score at 20 points maximum
+  score += Math.min(20, Math.max(0, bonusScore));
+  
+  // Ensure score is between 0 and 100
+  const finalScore = Math.max(0, Math.min(100, Math.round(score)));
+  
+  // Determine conditions based on final score
+  let conditions = 'Poor';
+  if (finalScore >= 85) conditions = 'Spectacular';
+  else if (finalScore >= 70) conditions = 'Excellent';
+  else if (finalScore >= 55) conditions = 'Good';
+  else if (finalScore >= 35) conditions = 'Fair';
+  else if (finalScore >= 15) conditions = 'Poor';
+  
+  return {
+    score: finalScore,
+    conditions: conditions
+  };
+};
+
+/**
+ * Simplified cloud type mapping for weather codes (minimal usage now)
  * @param {number} code - WMO weather interpretation code
  * @returns {Object} - {type: string, height: number}
  */
 export const getCloudTypeFromWeatherCode = (code) => {
-  // Simplified WMO weather codes mapping
   const weatherTypes = {
     0: { type: 'Clear', height: 0 },
-    1: { type: 'Mainly Clear', height: 8 },
-    2: { type: 'Partly Cloudy', height: 7 },
+    1: { type: 'Mainly Clear', height: 0 },
+    2: { type: 'Partly Cloudy', height: 4 },
     3: { type: 'Overcast', height: 3 },
     45: { type: 'Fog', height: 0.5 },
     48: { type: 'Fog', height: 0.5 },
@@ -34,168 +205,5 @@ export const getCloudTypeFromWeatherCode = (code) => {
     99: { type: 'Thunderstorm with Hail', height: 10 }
   };
   
-  return weatherTypes[code] || { type: 'Partly Cloudy', height: 5 };
-};
-
-/**
- * Professional sunset quality score based on meteorological factors
- * Based on research from SunsetWx, Sunsethue, and atmospheric science
- * @param {Object} weather - Weather data object
- * @returns {Object} - {score: number}
- */
-export const getSunsetQualityScore = (weather) => {
-  let score = 0; // Start from 0, build up based on factors
-  
-  const cloudType = weather.cloud_type?.toLowerCase() || '';
-  const cloudCoverage = weather.cloud_coverage || 0;
-  const cloudHeight = weather.cloud_height_km || 0;
-  const precipChance = weather.precipitation_chance || 0;
-  const humidity = weather.humidity || 50;
-  const aqi = weather.air_quality_index || 50;
-  const visibility = weather.visibility || 10000;
-  const windSpeed = weather.wind_speed || 10;
-  
-  // 1. CLOUD TYPE & HEIGHT (30% of score) - Most important factor
-  // High clouds (6-12km) are ideal for vibrant sunsets
-  if (cloudHeight >= 6 && cloudHeight <= 12) {
-    if (cloudType.includes('cirrus') || cloudType.includes('cirrostratus')) {
-      score += 30; // Perfect high clouds
-    } else if (cloudType.includes('altocumulus') || cloudType.includes('altostratus')) {
-      score += 22; // Good high clouds
-    } else {
-      score += 18; // Any high clouds are good
-    }
-  }
-  // Mid-level clouds (2-6km) are good for sunsets
-  else if (cloudHeight >= 2 && cloudHeight <= 6) {
-    if (cloudType.includes('altocumulus') || cloudType.includes('altostratus')) {
-      score += 18; // Good mid-level clouds
-    } else if (cloudType.includes('cumulus')) {
-      score += 14; // Decent mid-level clouds
-    } else {
-      score += 10; // Any mid-level clouds help
-    }
-  }
-  // Low clouds (0-2km) can be problematic
-  else if (cloudHeight < 2) {
-    if (cloudType.includes('stratus') || cloudType.includes('fog')) {
-      score -= 20; // Low clouds block sunset
-    } else if (cloudType.includes('cumulus')) {
-      score += 8; // Some low clouds can be okay
-    } else {
-      score += 5; // Clear skies are okay
-    }
-  }
-  // Very high clouds (above 12km) are excellent
-  else if (cloudHeight > 12) {
-    score += 35; // Exceptional high clouds
-  }
-  
-  // 2. CLOUD COVERAGE (20% of score) - Optimal range is 25-50%
-  if (cloudCoverage >= 25 && cloudCoverage <= 40) {
-    score += 20; // Perfect coverage for colorful sunsets
-  } else if (cloudCoverage >= 40 && cloudCoverage <= 55) {
-    score += 16; // Good coverage
-  } else if (cloudCoverage >= 15 && cloudCoverage <= 25) {
-    score += 12; // Some clouds, better than none
-  } else if (cloudCoverage >= 5 && cloudCoverage <= 15) {
-    score += 8; // Light clouds
-  } else if (cloudCoverage === 0) {
-    score += 5; // Clear skies are okay but not optimal
-  } else if (cloudCoverage > 80) {
-    score -= 15; // Too much cloud cover
-  } else if (cloudCoverage > 60) {
-    score += 3; // Heavy clouds can still work
-  }
-  
-  // 3. PRECIPITATION (15% of score) - Rain ruins sunsets
-  if (precipChance >= 70) {
-    score -= 25; // Heavy rain
-  } else if (precipChance >= 50) {
-    score -= 15; // Moderate-heavy rain
-  } else if (precipChance >= 30) {
-    score -= 8; // Moderate rain
-  } else if (precipChance >= 15) {
-    score -= 3; // Light rain chance
-  } else if (precipChance < 5) {
-    score += 12; // Very low rain chance is excellent
-  } else if (precipChance < 10) {
-    score += 8; // Low rain chance is good
-  } else {
-    score += 4; // Some rain chance is okay
-  }
-  
-  // 4. AIR QUALITY (12% of score) - Clean air is better
-  if (aqi <= 20) {
-    score += 12; // Exceptional air quality
-  } else if (aqi <= 40) {
-    score += 10; // Excellent air quality
-  } else if (aqi <= 60) {
-    score += 7; // Good air quality
-  } else if (aqi <= 100) {
-    score += 4; // Moderate air quality
-  } else if (aqi <= 150) {
-    score += 1; // Unhealthy for sensitive groups
-  } else {
-    score -= 8; // Poor air quality
-  }
-  
-  // 5. HUMIDITY (8% of score) - Lower humidity is better
-  if (humidity <= 25) {
-    score += 8; // Very low humidity, crystal clear air
-  } else if (humidity <= 45) {
-    score += 6; // Low humidity, clear air
-  } else if (humidity <= 65) {
-    score += 3; // Moderate humidity is okay
-  } else if (humidity >= 85) {
-    score -= 5; // High humidity dampens colors
-  } else {
-    score += 1; // Slightly elevated humidity
-  }
-  
-  // 6. VISIBILITY (8% of score) - Good visibility helps
-  if (visibility >= 15000) {
-    score += 8; // Exceptional visibility
-  } else if (visibility >= 10000) {
-    score += 6; // Excellent visibility
-  } else if (visibility >= 7000) {
-    score += 4; // Good visibility
-  } else if (visibility >= 4000) {
-    score += 2; // Fair visibility
-  } else {
-    score -= 5; // Poor visibility
-  }
-  
-  // 7. WIND (7% of score) - Light wind can help with cloud movement
-  if (windSpeed >= 5 && windSpeed <= 12) {
-    score += 7; // Ideal wind enhances cloud formations
-  } else if (windSpeed >= 3 && windSpeed <= 5) {
-    score += 5; // Light wind is good
-  } else if (windSpeed >= 12 && windSpeed <= 20) {
-    score += 3; // Moderate wind is okay
-  } else if (windSpeed > 30) {
-    score -= 5; // Strong wind is problematic
-  } else if (windSpeed > 20) {
-    score -= 2; // Windy conditions
-  } else {
-    score += 2; // Very calm conditions
-  }
-  
-  // Penalty for bad weather conditions
-  if (cloudType.includes('thunderstorm') || cloudType.includes('rain')) {
-    score -= 20; // Severe weather
-  }
-  if (cloudType.includes('fog') || cloudType.includes('mist')) {
-    score -= 15; // Poor visibility conditions
-  }
-  
-  // Bonus for perfect combinations (rare!)
-  if (cloudHeight >= 6 && cloudCoverage >= 25 && cloudCoverage <= 45 && aqi <= 40 && precipChance < 5) {
-    score += 10; // Perfect sunset conditions bonus
-  }
-  
-  // Ensure score is between 0 and 100
-  const finalScore = Math.max(0, Math.min(100, Math.round(score)));
-  
-  return { score: finalScore };
+  return weatherTypes[code] || { type: 'Partly Cloudy', height: 3 };
 };

@@ -127,10 +127,8 @@ const SunsetForecast = memo(({ forecast, scrollProgress, onBack, onDataLoaded })
                 <h3 className="text-sm sm:text-base md:text-lg font-bold text-white mb-2 text-center">How Weather Affects Sunset</h3>
                 <div className="text-center">
                   <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-white/70 leading-tight">
-                    Cloud coverage and height dramatically impact sunset quality, with high clouds creating beautiful light scattering effects.
-                  </p>
-                  <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-white/70 leading-tight mt-0.5">
-                    Our algorithm analyzes 12+ weather factors to predict the perfect sunset experience.
+                    Our scientific algorithm analyzes real atmospheric data including cloud altitude, <br>
+                    </br>humidity, air quality, and precipitation to predict sunset quality.
                   </p>
                 </div>
               </div>

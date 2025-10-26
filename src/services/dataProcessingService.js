@@ -29,6 +29,9 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
     
     const weatherCode = weatherData.hourly?.weather_code?.[safeHourIndex] || 0;
     const cloudCoverage = weatherData.hourly?.cloud_cover?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_HUMIDITY;
+    const cloudCoverageLow = weatherData.hourly?.cloud_cover_low?.[safeHourIndex] || 0;
+    const cloudCoverageMid = weatherData.hourly?.cloud_cover_mid?.[safeHourIndex] || 0;
+    const cloudCoverageHigh = weatherData.hourly?.cloud_cover_high?.[safeHourIndex] || 0;
     const humidity = weatherData.hourly?.relative_humidity_2m?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_HUMIDITY;
     const precipChance = weatherData.hourly?.precipitation_probability?.[safeHourIndex] || 0;
     const visibility = weatherData.hourly?.visibility?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_VISIBILITY;
@@ -43,11 +46,13 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
     // Get cloud type and height from weather code
     const cloudInfo = getCloudTypeFromWeatherCode(weatherCode);
     
-    // Create weather object for scoring
+    // Create weather object for scoring (consistent with forecast data)
     const weatherForScoring = {
       cloud_type: cloudInfo.type,
       cloud_coverage: cloudCoverage,
-      cloud_height_km: cloudInfo.height,
+      cloud_coverage_low: cloudCoverageLow,
+      cloud_coverage_mid: cloudCoverageMid,
+      cloud_coverage_high: cloudCoverageHigh,
       precipitation_chance: precipChance,
       humidity: humidity,
       air_quality_index: Math.round(aqi),
@@ -55,7 +60,7 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
       wind_speed: windSpeed
     };
     
-    // Apply our existing scoring algorithm
+    // Apply scoring algorithm
     const scoreResult = getSunsetQualityScore(weatherForScoring);
     
     // Get sunset time from daily data
@@ -70,9 +75,11 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
         day: 'numeric'
       }),
       score: scoreResult.score,
-      conditions: cloudInfo.type,
+      conditions: scoreResult.conditions, // Use scientific conditions from scoring
       cloud_coverage: cloudCoverage,
-      cloud_height_km: cloudInfo.height,
+      cloud_coverage_low: cloudCoverageLow,
+      cloud_coverage_mid: cloudCoverageMid,
+      cloud_coverage_high: cloudCoverageHigh,
       humidity: humidity,
       precipitation_chance: precipChance,
       visibility: visibility,
@@ -103,7 +110,9 @@ export const getTop10Sunsets = (historicalData) => {
       score: day.score,
       conditions: day.conditions,
       cloud_coverage: day.cloud_coverage,
-      cloud_height_km: day.cloud_height_km,
+      cloud_coverage_low: day.cloud_coverage_low,
+      cloud_coverage_mid: day.cloud_coverage_mid,
+      cloud_coverage_high: day.cloud_coverage_high,
       humidity: day.humidity,
       precipitation_chance: day.precipitation_chance,
       visibility: day.visibility,

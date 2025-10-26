@@ -41,7 +41,7 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
     `latitude=${coords.latitude}&` +
     `longitude=${coords.longitude}&` +
     `daily=weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise&` +
-    `hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,visibility,wind_speed_10m&` +
+    `hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,wind_speed_10m&` +
     `timezone=auto${apiKeyParam}`;
   
   const response = await fetch(url, {
@@ -54,7 +54,8 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to fetch forecast data: ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch forecast data: ${response.status} - ${errorText}`);
   }
   
   const apiData = await response.json();
@@ -77,14 +78,20 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
       precipitation_probability: hourlyData.precipitation_probability.slice(startHour, endHour),
       weather_code: hourlyData.weather_code.slice(startHour, endHour),
       cloud_cover: hourlyData.cloud_cover.slice(startHour, endHour),
+      cloud_cover_low: hourlyData.cloud_cover_low?.slice(startHour, endHour) || [],
+      cloud_cover_mid: hourlyData.cloud_cover_mid?.slice(startHour, endHour) || [],
+      cloud_cover_high: hourlyData.cloud_cover_high?.slice(startHour, endHour) || [],
       visibility: hourlyData.visibility.slice(startHour, endHour),
       wind_speed: hourlyData.wind_speed_10m.slice(startHour, endHour)
     };
     
-    // Calculate averages
+    // Calculate averages with safety checks
     const avgHumidity = dayHours.humidity.reduce((sum, hum) => sum + hum, 0) / 24;
     const avgPrecipitation = dayHours.precipitation_probability.reduce((sum, prec) => sum + prec, 0) / 24;
     const avgCloudCover = dayHours.cloud_cover.reduce((sum, cloud) => sum + cloud, 0) / 24;
+    const avgCloudCoverLow = dayHours.cloud_cover_low?.reduce((sum, cloud) => sum + cloud, 0) / 24 || 0;
+    const avgCloudCoverMid = dayHours.cloud_cover_mid?.reduce((sum, cloud) => sum + cloud, 0) / 24 || 0;
+    const avgCloudCoverHigh = dayHours.cloud_cover_high?.reduce((sum, cloud) => sum + cloud, 0) / 24 || 0;
     const avgVisibility = dayHours.visibility.reduce((sum, vis) => sum + vis, 0) / 24;
     const avgWindSpeed = dayHours.wind_speed.reduce((sum, wind) => sum + wind, 0) / 24;
     
@@ -104,6 +111,9 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
     const weatherForScoring = {
       cloud_type: cloudInfo.type,
       cloud_coverage: avgCloudCover,
+      cloud_coverage_low: avgCloudCoverLow,
+      cloud_coverage_mid: avgCloudCoverMid,
+      cloud_coverage_high: avgCloudCoverHigh,
       cloud_height_km: cloudInfo.height,
       precipitation_chance: avgPrecipitation,
       humidity: avgHumidity,
@@ -112,7 +122,7 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
       wind_speed: avgWindSpeed
     };
     
-    // Calculate sunset score using the proper scoring service
+    // Calculate sunset score using Open-Meteo cloud cover data
     const scoreResult = getSunsetQualityScore(weatherForScoring);
     
     // Format sunset time
@@ -180,7 +190,7 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
     `longitude=${longitude}&` +
     `start_date=${year}-01-01&` +
     `end_date=${today}&` +
-    `hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,visibility,wind_speed_10m&` +
+    `hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,wind_speed_10m&` +
     `daily=weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise&` +
     `timezone=auto${apiKeyParam}`;
   
