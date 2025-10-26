@@ -270,6 +270,7 @@ const Home = () => {
   }, [scrollProgress]);
 
   return (
+    <>
     <div 
       ref={containerRef}
       className="relative h-screen overflow-x-auto overflow-y-hidden flex horizontal-scroll-container"
@@ -375,9 +376,6 @@ const Home = () => {
         </div>
         </div>
 
-      {/* Animated Sun - sets behind mountains as you scroll right */}
-      <Sun scrollProgress={scrollProgress} />
-
       {/* Mountain silhouettes - scrolls with horizontal navigation */}
       <Mountains />
 
@@ -399,6 +397,11 @@ const Home = () => {
         )}
       </div>
     </div>
+
+    {/* Fixed positioned elements outside scrollable container */}
+    {/* Animated Sun - sets behind mountains as you scroll right */}
+    <Sun scrollProgress={scrollProgress} />
+  </>
   );
 };
 
