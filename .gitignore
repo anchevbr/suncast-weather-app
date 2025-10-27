@@ -102,3 +102,7 @@ jspm_packages/
 # Temporary folders
 tmp/
 temp/
+
+# Cache data files (keep structure, ignore data)
+backend/cache/historical/*.json
+!backend/cache/historical/index.json
