@@ -68,16 +68,3 @@ export const getHistoricalColors = (score) => {
   return { circle: 'bg-gray-500', text: 'text-gray-300' };
 };
 
-/**
- * Get scoring system display data
- * @returns {Array} Array of score range objects for display
- */
-export const getScoringSystem = () => {
-  return [
-    { ...SUNSET_COLORS.POOR, range: '0-39' },
-    { ...SUNSET_COLORS.FAIR, range: '40-59' },
-    { ...SUNSET_COLORS.GOOD, range: '60-79' },
-    { ...SUNSET_COLORS.EXCELLENT, range: '80-89' },
-    { ...SUNSET_COLORS.SPECTACULAR, range: '90-100' }
-  ];
-};

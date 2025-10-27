@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import PropTypes from 'prop-types';
 import { MapPin, Loader2 } from 'lucide-react';
 import { useGeocoding } from '../hooks/useGeocoding';
 
@@ -190,5 +191,10 @@ const LocationAutocomplete = memo(({ onLocationSelect, placeholder = "Search for
 });
 
 LocationAutocomplete.displayName = 'LocationAutocomplete';
+
+LocationAutocomplete.propTypes = {
+  onLocationSelect: PropTypes.func.isRequired,
+  placeholder: PropTypes.string
+};
 
 export default LocationAutocomplete;

@@ -1,5 +1,7 @@
 import React, { memo, useMemo } from "react";
+import PropTypes from 'prop-types';
 import { interpolateRGB, rgbToString } from "../../utils/colorUtils";
+import { VISUAL_CONSTANTS } from "../../constants/app";
 
 /**
  * Sun Component
@@ -9,54 +11,53 @@ import { interpolateRGB, rgbToString } from "../../utils/colorUtils";
  */
 const Sun = memo(({ scrollProgress }) => {
   // Memoize sun color and gradient calculations
-  // OPTIMIZED: Round scrollProgress to reduce recalculations
-  const roundedProgress = useMemo(() => Math.round(scrollProgress * 100) / 100, [scrollProgress]);
-  
   const sunStyles = useMemo(() => {
     // Define day and sunset colors
     const dayColor = { r: 255, g: 250, b: 240 };
     const sunsetColor = { r: 255, g: 0, b: 0 };
     
     // Calculate interpolation factor based on progress
-    const colorProgress = roundedProgress < 0.2 ? 0 : (roundedProgress - 0.2) / 0.8;
+    const colorProgress = scrollProgress < 0.2 ? 0 : (scrollProgress - 0.2) / 0.8;
     const { r: red, g: green, b: blue } = interpolateRGB(dayColor, sunsetColor, colorProgress);
     
     // Much less feathering for more defined sun shape
-    // Calculate feather factor: 0.2 at start (much less feather), 0.0 at 80%+ (sharp)
-    const featherFactor = roundedProgress < 0.8 ? 0.2 - (roundedProgress / 0.8) * 0.2 : 0;
+    // Calculate feather factor: VISUAL_CONSTANTS.SUN_FEATHER_FACTOR at start (much less feather), 0.0 at 80%+ (sharp)
+    const featherFactor = scrollProgress < 0.8 ? VISUAL_CONSTANTS.SUN_FEATHER_FACTOR - (scrollProgress / 0.8) * VISUAL_CONSTANTS.SUN_FEATHER_FACTOR : 0;
     
-    // Interpolate gradient stops based on featherFactor (much less feathering)
-    // When featherFactor = 0.2: minimal feather, more defined
-    // When featherFactor = 0: sharp (fewer stops, higher opacity)
-    const a10 = 1 - (0.005 * featherFactor);  // 0.999 -> 1.0
-    const a20 = 1 - (0.01 * featherFactor);   // 0.998 -> 1.0
-    const a30 = 1 - (0.025 * featherFactor);  // 0.995 -> 1.0
-    const a40 = 1 - (0.05 * featherFactor);    // 0.99 -> 1.0
-    const a50 = 0.98 - (0.05 * featherFactor); // 0.97 -> 0.98
-    const a60 = 0.95 - (0.10 * featherFactor); // 0.93 -> 0.95
-    const a70 = 0.9 - (0.15 * featherFactor);  // 0.87 -> 0.9
-    const a80 = 0.8 - (0.15 * featherFactor);  // 0.77 -> 0.8
-    const a90 = 0.6 - (0.10 * featherFactor);  // 0.58 -> 0.6
-    const a95 = 0.4 - (0.05 * featherFactor);  // 0.39 -> 0.4
-    const a98 = 0.2 - (0.02 * featherFactor);  // 0.196 -> 0.2
+    // Pre-calculate gradient stops for better performance
+    const gradientStops = [
+      `rgba(${red}, ${green}, ${blue}, 1) 0%`,
+      `rgba(${red}, ${green}, ${blue}, ${1 - (0.005 * featherFactor)}) 10%`,
+      `rgba(${red}, ${green}, ${blue}, ${1 - (0.01 * featherFactor)}) 20%`,
+      `rgba(${red}, ${green}, ${blue}, ${1 - (0.025 * featherFactor)}) 30%`,
+      `rgba(${red}, ${green}, ${blue}, ${1 - (0.05 * featherFactor)}) 40%`,
+      `rgba(${red}, ${green}, ${blue}, ${0.98 - (0.05 * featherFactor)}) 50%`,
+      `rgba(${red}, ${green}, ${blue}, ${0.95 - (0.10 * featherFactor)}) 60%`,
+      `rgba(${red}, ${green}, ${blue}, ${0.9 - (0.15 * featherFactor)}) 70%`,
+      `rgba(${red}, ${green}, ${blue}, ${0.8 - (0.15 * featherFactor)}) 80%`,
+      `rgba(${red}, ${green}, ${blue}, ${0.6 - (0.10 * featherFactor)}) 90%`,
+      `rgba(${red}, ${green}, ${blue}, ${0.4 - (0.05 * featherFactor)}) 95%`,
+      `rgba(${red}, ${green}, ${blue}, ${0.2 - (0.02 * featherFactor)}) 98%`,
+      'transparent 100%'
+    ];
     
-    const gradient = `radial-gradient(circle, rgba(${red}, ${green}, ${blue}, 1) 0%, rgba(${red}, ${green}, ${blue}, ${a10}) 10%, rgba(${red}, ${green}, ${blue}, ${a20}) 20%, rgba(${red}, ${green}, ${blue}, ${a30}) 30%, rgba(${red}, ${green}, ${blue}, ${a40}) 40%, rgba(${red}, ${green}, ${blue}, ${a50}) 50%, rgba(${red}, ${green}, ${blue}, ${a60}) 60%, rgba(${red}, ${green}, ${blue}, ${a70}) 70%, rgba(${red}, ${green}, ${blue}, ${a80}) 80%, rgba(${red}, ${green}, ${blue}, ${a90}) 90%, rgba(${red}, ${green}, ${blue}, ${a95}) 95%, rgba(${red}, ${green}, ${blue}, ${a98}) 98%, transparent 100%)`;
+    const gradient = `radial-gradient(circle, ${gradientStops.join(', ')})`;
     
-    // Reduced blur: 4px at 0%, gradually to 0px at 80%, completely sharp at 100%
+    // Reduced blur: VISUAL_CONSTANTS.SUN_BLUR_MAX at 0%, gradually to 0px at 80%, completely sharp at 100%
     // Using quadratic easing for more natural transition (faster at start, slower at end)
     // After 80% (4 seconds), transition to 0 blur for sharp sunset
-    const blur = roundedProgress < 0.8 ? 4 * Math.pow(1 - (roundedProgress / 0.8), 2) : 0;
+    const blur = scrollProgress < 0.8 ? VISUAL_CONSTANTS.SUN_BLUR_MAX * Math.pow(1 - (scrollProgress / 0.8), 2) : 0;
     
     return { gradient, blur };
-  }, [roundedProgress]);
+  }, [scrollProgress]);
 
   return (
     <div
       className="fixed pointer-events-none z-5"
       style={{
         left: '10%',
-        top: `${20 + scrollProgress * 65}vh`,
-        opacity: 1 - scrollProgress * 0.4,
+        top: `${VISUAL_CONSTANTS.SUN_POSITION_START + scrollProgress * VISUAL_CONSTANTS.SUN_POSITION_OFFSET}vh`,
+        opacity: 1 - scrollProgress * VISUAL_CONSTANTS.SUN_OPACITY_FADE,
         transition: 'none', // No CSS transitions - driven by scroll
         willChange: 'top, opacity',
         transform: 'translateZ(0)' // GPU acceleration
@@ -93,6 +94,10 @@ const Sun = memo(({ scrollProgress }) => {
 });
 
 Sun.displayName = 'Sun';
+
+Sun.propTypes = {
+  scrollProgress: PropTypes.number.isRequired
+};
 
 export default Sun;
 

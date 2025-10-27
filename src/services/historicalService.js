@@ -28,6 +28,14 @@ export const fetchHistoricalForecast = async (location) => {
     const top10 = getTop10Sunsets(processedData);
     const statistics = getScoreStatistics(processedData);
     
+    // DEBUG: Log historical service result
+    console.log('📊 Historical Service Result:', {
+      processedDataLength: processedData.length,
+      top10Length: top10.length,
+      sampleTop10: top10.slice(0, 3),
+      statistics: statistics
+    });
+    
     return {
       location,
       year,
@@ -71,6 +79,14 @@ export const fetchHistoricalForecastWithProgress = async (location, onProgress) 
     onProgress({ stage: 'calculating_stats', progress: 90 });
     const top10 = getTop10Sunsets(processedData);
     const statistics = getScoreStatistics(processedData);
+    
+    // DEBUG: Log historical service result (progress version)
+    console.log('📊 Historical Service Result (Progress):', {
+      processedDataLength: processedData.length,
+      top10Length: top10.length,
+      sampleTop10: top10.slice(0, 3),
+      statistics: statistics
+    });
     
     // Progress: Complete
     onProgress({ stage: 'complete', progress: 100 });

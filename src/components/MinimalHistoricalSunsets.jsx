@@ -1,14 +1,24 @@
 import React, { memo } from "react";
+import PropTypes from 'prop-types';
 import { motion } from "framer-motion";
 import { getHistoricalColors } from "../utils/colorPalette";
 
-// Static array for loading animation bars
+// Static array for loading animation bars - moved outside component to prevent recreation
 const LOADING_BARS = Array.from({ length: 10 }, (_, i) => i);
 
 const MinimalHistoricalSunsets = memo(({
   historicalData,
   isLoading
 }) => {
+  // DEBUG: Log what the component receives
+  console.log('🎯 MinimalHistoricalSunsets received:', {
+    isLoading: isLoading,
+    hasHistoricalData: !!historicalData,
+    hasTop10: !!historicalData?.top10,
+    top10Length: historicalData?.top10?.length,
+    sampleTop10: historicalData?.top10?.slice(0, 2)
+  });
+
   // Show beautiful loading animation
   if (isLoading) {
     return (
@@ -89,7 +99,8 @@ const MinimalHistoricalSunsets = memo(({
           {/* Grid with circles aligned to background */}
           <div className="relative z-10 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-1 sm:gap-2 text-[10px] sm:text-xs">
                     {historicalData.top10 && historicalData.top10.map((sunset, index) => {
-                      const colors = getHistoricalColors(sunset.score);
+                      const score = sunset.sunset_score || sunset.score;
+                      const colors = getHistoricalColors(score);
                       return (
                       <motion.div
                         key={sunset.date}
@@ -102,7 +113,7 @@ const MinimalHistoricalSunsets = memo(({
                         <div className="flex items-center justify-center space-x-0.5 sm:space-x-1 h-7 sm:h-8 w-full">
                           <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${colors.circle}`}></div>
                           <span className={`text-[10px] sm:text-xs ${colors.text}`}>
-                            {sunset.score}
+                            {score}
                           </span>
                         </div>
                         <div className="text-white text-[10px] sm:text-xs">
@@ -122,5 +133,16 @@ const MinimalHistoricalSunsets = memo(({
 });
 
 MinimalHistoricalSunsets.displayName = 'MinimalHistoricalSunsets';
+
+MinimalHistoricalSunsets.propTypes = {
+  historicalData: PropTypes.shape({
+    top10: PropTypes.arrayOf(PropTypes.shape({
+      date: PropTypes.string.isRequired,
+      score: PropTypes.number.isRequired,
+      sunset_time: PropTypes.string
+    }))
+  }),
+  isLoading: PropTypes.bool.isRequired
+};
 
 export default MinimalHistoricalSunsets;

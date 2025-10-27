@@ -1,4 +1,5 @@
 import React, { memo, useMemo } from "react";
+import PropTypes from 'prop-types';
 import { Sun, Cloud, CloudRain, CloudSnow, CloudFog, CloudSun, CloudDrizzle } from "lucide-react";
 
 /**
@@ -56,5 +57,13 @@ const WeatherIcon = memo(({ day }) => {
 });
 
 WeatherIcon.displayName = 'WeatherIcon';
+
+WeatherIcon.propTypes = {
+  day: PropTypes.shape({
+    conditions: PropTypes.string,
+    precipitation_chance: PropTypes.number,
+    cloud_coverage: PropTypes.number
+  }).isRequired
+};
 
 export default WeatherIcon;

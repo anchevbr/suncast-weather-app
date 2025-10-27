@@ -1,4 +1,5 @@
 import React, { memo } from "react";
+import PropTypes from 'prop-types';
 import { Card } from "./components/ui/card";
 import { Sun } from "lucide-react";
 import WeatherIcon from "./components/weather/WeatherIcon";
@@ -58,5 +59,26 @@ const DayCard = memo(({ day, index }) => {
 });
 
 DayCard.displayName = 'DayCard';
+
+DayCard.propTypes = {
+  day: PropTypes.shape({
+    sunset_score: PropTypes.number.isRequired,
+    sunset_time: PropTypes.string.isRequired,
+    day_of_week: PropTypes.string.isRequired,
+    date: PropTypes.string.isRequired,
+    weather_code: PropTypes.number,
+    temperature_max: PropTypes.number,
+    temperature_min: PropTypes.number,
+    sunset: PropTypes.string,
+    sunrise: PropTypes.string,
+    conditions: PropTypes.string,
+    cloud_coverage: PropTypes.number,
+    humidity: PropTypes.number,
+    precipitation_chance: PropTypes.number,
+    visibility: PropTypes.number,
+    wind_speed: PropTypes.number
+  }).isRequired,
+  index: PropTypes.number.isRequired
+};
 
 export default DayCard;

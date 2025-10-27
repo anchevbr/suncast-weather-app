@@ -1,13 +1,18 @@
 import React, { useState, useEffect, memo } from "react";
+import PropTypes from 'prop-types';
 import { Button } from "./components/ui/button";
 import { ArrowUp } from "lucide-react";
 import DayCard from "./DayCard";
 import MinimalHistoricalSunsets from "./components/MinimalHistoricalSunsets";
 import { fetchHistoricalForecastWithProgress } from "./services/historicalService.js";
+import { useScrollContext, useLoadingContext } from "./contexts/AppContext.jsx";
 
-const SunsetForecast = memo(({ forecast, scrollProgress, onBack, onDataLoaded }) => {
+const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
   const [historicalData, setHistoricalData] = useState(null);
   const [isLoadingHistorical, setIsLoadingHistorical] = useState(true);
+  
+  // Use context instead of props
+  const { scrollProgress } = useScrollContext();
 
   // Auto-load historical data when component mounts
   // Only run once when forecast changes (not on every render)
@@ -22,12 +27,21 @@ const SunsetForecast = memo(({ forecast, scrollProgress, onBack, onDataLoaded })
           name: forecast.location
         };
         
+        console.log('🔍 Fetching Historical Data for:', location);
+        
         const data = await fetchHistoricalForecastWithProgress(
           location, 
           () => {} // Ignore progress updates
         );
         
         if (!isCancelled) {
+          console.log('📊 Historical Data Received:', {
+            hasData: !!data,
+            hasTop10: !!data?.top10,
+            top10Length: data?.top10?.length,
+            sampleTop10: data?.top10?.slice(0, 3),
+            statistics: data?.statistics
+          });
           setHistoricalData(data);
           setIsLoadingHistorical(false);
           
@@ -37,6 +51,7 @@ const SunsetForecast = memo(({ forecast, scrollProgress, onBack, onDataLoaded })
           }
         }
       } catch (error) {
+        console.error('❌ Historical Data Error:', error);
         if (!isCancelled) {
           setIsLoadingHistorical(false);
           
@@ -141,5 +156,32 @@ const SunsetForecast = memo(({ forecast, scrollProgress, onBack, onDataLoaded })
 });
 
 SunsetForecast.displayName = 'SunsetForecast';
+
+SunsetForecast.propTypes = {
+  forecast: PropTypes.shape({
+    location: PropTypes.string.isRequired,
+    latitude: PropTypes.number.isRequired,
+    longitude: PropTypes.number.isRequired,
+    days: PropTypes.arrayOf(PropTypes.shape({
+      date: PropTypes.string.isRequired,
+      day_of_week: PropTypes.string.isRequired,
+      sunset_score: PropTypes.number.isRequired,
+      sunset_time: PropTypes.string.isRequired,
+      conditions: PropTypes.string.isRequired,
+      weather_code: PropTypes.number,
+      temperature_max: PropTypes.number,
+      temperature_min: PropTypes.number,
+      sunset: PropTypes.string,
+      sunrise: PropTypes.string,
+      cloud_coverage: PropTypes.number,
+      humidity: PropTypes.number,
+      precipitation_chance: PropTypes.number,
+      visibility: PropTypes.number,
+      wind_speed: PropTypes.number
+    })).isRequired
+  }).isRequired,
+  onBack: PropTypes.func.isRequired,
+  onDataLoaded: PropTypes.func.isRequired
+};
 
 export default SunsetForecast;

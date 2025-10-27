@@ -8,6 +8,7 @@ import { SUNSET_CONSTANTS } from '../constants/app.js';
 
 /**
  * Process historical weather data to calculate sunset scores for each day
+ * NOW USES ACTUAL SUNSET HOUR CONDITIONS for accurate scoring
  * @param {Object} weatherData - Historical weather data from Open-Meteo
  * @param {Object} aqiData - Historical air quality data (optional)
  * @param {Object} location - Location object with lat, lon, name
@@ -18,17 +19,53 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
   const days = [];
   const totalDays = weatherData.daily?.time?.length || 365;
   
-  // Process each day of the year
+  // DEBUG: Log overall data structure
+  console.log(`📊 Historical Data Structure:`, {
+    location: location,
+    year: year,
+    totalDays: totalDays,
+    hasDailyData: !!weatherData.daily,
+    hasHourlyData: !!weatherData.hourly,
+    dailyTimeLength: weatherData.daily?.time?.length,
+    hourlyTimeLength: weatherData.hourly?.time?.length,
+    hasSunsetData: !!weatherData.daily?.sunset,
+    firstSunsetTime: weatherData.daily?.sunset?.[0],
+    hasAqiData: !!aqiData
+  });
+  
+  // Process each day of the year - NOW USING ACTUAL SUNSET HOUR CONDITIONS
   for (let dayIndex = 0; dayIndex < totalDays; dayIndex++) {
-    const date = new Date(year, 0, dayIndex + 1);
-    const sunsetHour = SUNSET_CONSTANTS.APPROXIMATE_SUNSET_HOUR;
-    const hourIndex = (dayIndex * 24) + sunsetHour;
+    // Get sunset time from daily data
+    const sunsetDateTime = weatherData.daily?.sunset?.[dayIndex];
+    const sunsetTime = sunsetDateTime ? 
+      new Date(sunsetDateTime).toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      }) : '18:00';
     
-    // Get weather data for sunset hour (with bounds checking)
-    const safeHourIndex = Math.min(hourIndex, (weatherData.hourly?.time?.length || 0) - 1);
+    // Calculate sunset hour index in hourly data
+    const sunsetHour = sunsetDateTime ? new Date(sunsetDateTime).getHours() : 18;
+    const sunsetHourIndex = (dayIndex * 24) + sunsetHour;
+    
+    // Get weather conditions AT THE ACTUAL SUNSET HOUR
+    const safeHourIndex = Math.min(sunsetHourIndex, (weatherData.hourly?.time?.length || 0) - 1);
+    
+    // DEBUG: Log sunset time and hour calculation
+    if (dayIndex < 3) { // Only log first 3 days to avoid spam
+      console.log(`📅 Historical Day ${dayIndex + 1}:`, {
+        date: weatherData.daily.time[dayIndex],
+        sunsetDateTime: sunsetDateTime,
+        sunsetTime: sunsetTime,
+        sunsetHour: sunsetHour,
+        sunsetHourIndex: sunsetHourIndex,
+        safeHourIndex: safeHourIndex,
+        hourlyDataLength: weatherData.hourly?.time?.length || 0
+      });
+    }
     
     const weatherCode = weatherData.hourly?.weather_code?.[safeHourIndex] || 0;
-    const cloudCoverage = weatherData.hourly?.cloud_cover?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_HUMIDITY;
+    const cloudCoverage = weatherData.hourly?.cloud_cover?.[safeHourIndex] || 0;
     const cloudCoverageLow = weatherData.hourly?.cloud_cover_low?.[safeHourIndex] || 0;
     const cloudCoverageMid = weatherData.hourly?.cloud_cover_mid?.[safeHourIndex] || 0;
     const cloudCoverageHigh = weatherData.hourly?.cloud_cover_high?.[safeHourIndex] || 0;
@@ -37,22 +74,39 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
     const visibility = weatherData.hourly?.visibility?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_VISIBILITY;
     const windSpeed = weatherData.hourly?.wind_speed_10m?.[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_WIND_SPEED;
     
-    // Get AQI for this hour
+    // Get AQI for sunset hour
     let aqi = SUNSET_CONSTANTS.DEFAULT_AQI;
     if (aqiData && aqiData.hourly && aqiData.hourly.us_aqi) {
       aqi = aqiData.hourly.us_aqi[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_AQI;
     }
     
+    // DEBUG: Log sunset hour conditions
+    if (dayIndex < 3) { // Only log first 3 days to avoid spam
+      console.log(`🌅 Historical Sunset Conditions Day ${dayIndex + 1}:`, {
+        weatherCode: weatherCode,
+        cloudCoverage: cloudCoverage,
+        cloudCoverageLow: cloudCoverageLow,
+        cloudCoverageMid: cloudCoverageMid,
+        cloudCoverageHigh: cloudCoverageHigh,
+        humidity: humidity,
+        precipChance: precipChance,
+        visibility: visibility,
+        windSpeed: windSpeed,
+        aqi: aqi
+      });
+    }
+    
     // Get cloud type and height from weather code
     const cloudInfo = getCloudTypeFromWeatherCode(weatherCode);
     
-    // Create weather object for scoring (consistent with forecast data)
+    // Create weather object for scoring using ACTUAL SUNSET HOUR CONDITIONS
     const weatherForScoring = {
       cloud_type: cloudInfo.type,
       cloud_coverage: cloudCoverage,
       cloud_coverage_low: cloudCoverageLow,
       cloud_coverage_mid: cloudCoverageMid,
       cloud_coverage_high: cloudCoverageHigh,
+      cloud_height_km: cloudInfo.height,
       precipitation_chance: precipChance,
       humidity: humidity,
       air_quality_index: Math.round(aqi),
@@ -60,22 +114,36 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
       wind_speed: windSpeed
     };
     
-    // Apply scoring algorithm
+    // Apply scoring algorithm using ACTUAL SUNSET HOUR CONDITIONS
     const scoreResult = getSunsetQualityScore(weatherForScoring);
     
-    // Get sunset time from daily data
-    const sunsetTime = weatherData.daily?.sunset?.[dayIndex] || '18:00';
+    // DEBUG: Log scoring result
+    if (dayIndex < 3) { // Only log first 3 days to avoid spam
+      console.log(`🎯 Historical Scoring Result Day ${dayIndex + 1}:`, {
+        score: scoreResult.score,
+        conditions: scoreResult.conditions,
+        weatherForScoring: weatherForScoring
+      });
+    }
+    
+    // Get day of week
+    const dayOfWeek = new Date(weatherData.daily.time[dayIndex]).toLocaleDateString('en-US', { 
+      weekday: 'short' 
+    });
     
     days.push({
-      date: date.toISOString().split('T')[0],
-      formatted_date: date.toLocaleDateString('en-US', {
+      date: weatherData.daily.time[dayIndex],
+      day_of_week: dayOfWeek,
+      formatted_date: new Date(weatherData.daily.time[dayIndex]).toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       }),
       score: scoreResult.score,
-      conditions: scoreResult.conditions, // Use scientific conditions from scoring
+      sunset_score: scoreResult.score,
+      conditions: scoreResult.conditions,
+      weather_code: weatherCode,
       cloud_coverage: cloudCoverage,
       cloud_coverage_low: cloudCoverageLow,
       cloud_coverage_mid: cloudCoverageMid,
@@ -86,7 +154,8 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
       wind_speed: windSpeed,
       air_quality_index: Math.round(aqi),
       sunset_time: sunsetTime,
-      weather_code: weatherCode
+      sunset: weatherData.daily.sunset?.[dayIndex],
+      sunrise: weatherData.daily.sunrise?.[dayIndex]
     });
   }
   
@@ -101,14 +170,17 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
  */
 export const getTop10Sunsets = (historicalData) => {
   return historicalData
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => (b.sunset_score || b.score) - (a.sunset_score || a.score))
     .slice(0, 10)
     .map((day, index) => ({
       rank: index + 1,
       date: day.date,
+      day_of_week: day.day_of_week,
       formatted_date: day.formatted_date,
-      score: day.score,
+      score: day.sunset_score || day.score,
+      sunset_score: day.sunset_score || day.score,
       conditions: day.conditions,
+      weather_code: day.weather_code,
       cloud_coverage: day.cloud_coverage,
       cloud_coverage_low: day.cloud_coverage_low,
       cloud_coverage_mid: day.cloud_coverage_mid,
@@ -119,7 +191,8 @@ export const getTop10Sunsets = (historicalData) => {
       wind_speed: day.wind_speed,
       air_quality_index: day.air_quality_index,
       sunset_time: day.sunset_time,
-      weather_code: day.weather_code
+      sunset: day.sunset,
+      sunrise: day.sunrise
     }));
 };
 
@@ -129,7 +202,7 @@ export const getTop10Sunsets = (historicalData) => {
  * @returns {Object} - Statistics object
  */
 export const getScoreStatistics = (historicalData) => {
-  const scores = historicalData.map(day => day.score);
+  const scores = historicalData.map(day => day.sunset_score || day.score);
   const sortedScores = [...scores].sort((a, b) => b - a);
   
   return {

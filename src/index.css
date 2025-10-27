@@ -1,6 +1,6 @@
 /* stylelint-disable */
-/* Import Inter font - must be first */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+/* Import Inter font with optimized loading - must be first */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap&text=GoldenHourWilltonightssunsetbespectacular?Enterlocation...UsecurrentlocationLoadingdata...BacktoSearchScoringSystemHowWeatherAffectsSunsetOurScientificalgorithmanalyzesrealatmosphericdataincludingcloudaltitudehumidityairqualityandprecipitationtopredictsunsetquality.');
 
 @tailwind base;
 @tailwind components;

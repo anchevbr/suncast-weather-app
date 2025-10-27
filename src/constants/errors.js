@@ -11,6 +11,7 @@ export const ERROR_MESSAGES = {
   LOCATION_PERMISSION_DENIED: 'Unable to access your location. Please search manually.',
   LOCATION_NOT_SUPPORTED: 'Geolocation is not supported by your browser.',
   LOCATION_NAME_FAILED: 'Failed to get location name',
+  LOCATION_TIMEOUT: 'Location request timed out. Please try again.',
   
   // Geocoding errors
   GEOCODING_FAILED: 'Unable to fetch location suggestions',

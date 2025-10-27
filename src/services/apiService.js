@@ -3,7 +3,86 @@
  * No caching - direct API calls only
  */
 
-import { getForecastUrl, getAirQualityUrl, API_CONFIG } from '../config/api.js';
+import { getForecastUrl, getAirQualityUrl } from '../config/api.js';
+import { parseLocationQuery, processDayData } from './forecastDataProcessor.js';
+
+/**
+ * Build forecast API URL with proper parameter encoding
+ * @param {string} baseUrl - Base API URL
+ * @param {Object} coords - Coordinates object with latitude and longitude
+ * @param {string} apiKey - Optional API key
+ * @returns {string} Complete API URL
+ */
+const buildForecastUrl = (baseUrl, coords, apiKey = '') => {
+  const params = new URLSearchParams({
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise',
+    hourly: 'temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,wind_speed_10m',
+    timezone: 'auto'
+  });
+  
+  if (apiKey) {
+    params.append('apikey', apiKey);
+  }
+  
+  return `${baseUrl}?${params.toString()}`;
+};
+
+/**
+ * Build historical weather API URL with proper parameter encoding
+ * @param {string} baseUrl - Base API URL
+ * @param {number} latitude - Latitude coordinate
+ * @param {number} longitude - Longitude coordinate
+ * @param {string} startDate - Start date in YYYY-MM-DD format
+ * @param {string} endDate - End date in YYYY-MM-DD format
+ * @param {string} apiKey - Optional API key
+ * @returns {string} Complete API URL
+ */
+const buildHistoricalUrl = (baseUrl, latitude, longitude, startDate, endDate, apiKey = '') => {
+  const params = new URLSearchParams({
+    latitude,
+    longitude,
+    start_date: startDate,
+    end_date: endDate,
+    hourly: 'temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,wind_speed_10m',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise',
+    timezone: 'auto'
+  });
+  
+  if (apiKey) {
+    params.append('apikey', apiKey);
+  }
+  
+  return `${baseUrl}?${params.toString()}`;
+};
+
+/**
+ * Build air quality API URL with proper parameter encoding
+ * @param {string} baseUrl - Base API URL
+ * @param {number} latitude - Latitude coordinate
+ * @param {number} longitude - Longitude coordinate
+ * @param {string} startDate - Start date in YYYY-MM-DD format
+ * @param {string} endDate - End date in YYYY-MM-DD format
+ * @param {string} apiKey - Optional API key
+ * @returns {string} Complete API URL
+ */
+const buildAirQualityUrl = (baseUrl, latitude, longitude, startDate, endDate, apiKey = '') => {
+  const params = new URLSearchParams({
+    latitude,
+    longitude,
+    start_date: startDate,
+    end_date: endDate,
+    hourly: 'us_aqi',
+    timezone: 'auto'
+  });
+  
+  if (apiKey) {
+    params.append('apikey', apiKey);
+  }
+  
+  return `${baseUrl}?${params.toString()}`;
+};
 
 /**
  * Fetch live forecast data from Open-Meteo API
@@ -12,37 +91,13 @@ import { getForecastUrl, getAirQualityUrl, API_CONFIG } from '../config/api.js';
  * @returns {Promise<Object>} - Complete forecast object
  */
 export const fetchForecastData = async (locationQuery, customLocationName = null) => {
-  // Step 1: Parse coordinates
-  let coords;
-  let locationName;
-  
-  const coordMatch = locationQuery.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
-  if (coordMatch) {
-    coords = {
-      latitude: parseFloat(coordMatch[1]),
-      longitude: parseFloat(coordMatch[2]),
-      name: customLocationName ? customLocationName.split(',')[0] : 'Current Location',
-      country: customLocationName ? customLocationName.split(',').slice(1).join(',').trim() : ''
-    };
-    locationName = customLocationName || 'Current Location';
-  } else {
-    throw new Error('Location must be provided as coordinates or through autocomplete');
-  }
+  // Step 1: Parse coordinates using utility function
+  const { coords, locationName } = parseLocationQuery(locationQuery, customLocationName);
 
   // Step 2: Fetch from Open-Meteo API directly
-  // Add API key if using Open-Meteo Commercial (set in environment variable)
   const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
-  const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
-  
-  // Use customer API URL if API key is provided
   const baseUrl = getForecastUrl(apiKey);
-  
-  const url = `${baseUrl}?` +
-    `latitude=${coords.latitude}&` +
-    `longitude=${coords.longitude}&` +
-    `daily=weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise&` +
-    `hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,wind_speed_10m&` +
-    `timezone=auto${apiKeyParam}`;
+  const url = buildForecastUrl(baseUrl, coords, apiKey);
   
   const response = await fetch(url, {
     method: 'GET',
@@ -60,101 +115,25 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
   
   const apiData = await response.json();
   
-  // Import the scoring service
-  const { getSunsetQualityScore, getCloudTypeFromWeatherCode } = await import('./scoringService.js');
+  // DEBUG: Log overall API data structure
+  console.log(`📊 Live Forecast API Data Structure:`, {
+    location: locationName,
+    coords: coords,
+    hasDailyData: !!apiData.daily,
+    hasHourlyData: !!apiData.hourly,
+    dailyTimeLength: apiData.daily?.time?.length,
+    hourlyTimeLength: apiData.hourly?.time?.length,
+    hasSunsetData: !!apiData.daily?.sunset,
+    firstSunsetTime: apiData.daily?.sunset?.[0],
+    sampleHourlyTime: apiData.hourly?.time?.slice(0, 3)
+  });
   
-  // Process the data to match expected format with scoring
+  // Step 3: Process the data using utility functions
   const days = [];
   for (let i = 0; i < apiData.daily.time.length; i++) {
-    // Get hourly data for this day (24 hours starting from 00:00)
-    const startHour = i * 24;
-    const endHour = startHour + 24;
-    
-    // Calculate average values for the day
-    const hourlyData = apiData.hourly;
-    const dayHours = {
-      temperature: hourlyData.temperature_2m.slice(startHour, endHour),
-      humidity: hourlyData.relative_humidity_2m.slice(startHour, endHour),
-      precipitation_probability: hourlyData.precipitation_probability.slice(startHour, endHour),
-      weather_code: hourlyData.weather_code.slice(startHour, endHour),
-      cloud_cover: hourlyData.cloud_cover.slice(startHour, endHour),
-      cloud_cover_low: hourlyData.cloud_cover_low?.slice(startHour, endHour) || [],
-      cloud_cover_mid: hourlyData.cloud_cover_mid?.slice(startHour, endHour) || [],
-      cloud_cover_high: hourlyData.cloud_cover_high?.slice(startHour, endHour) || [],
-      visibility: hourlyData.visibility.slice(startHour, endHour),
-      wind_speed: hourlyData.wind_speed_10m.slice(startHour, endHour)
-    };
-    
-    // Calculate averages with safety checks
-    const avgHumidity = dayHours.humidity.reduce((sum, hum) => sum + hum, 0) / 24;
-    const avgPrecipitation = dayHours.precipitation_probability.reduce((sum, prec) => sum + prec, 0) / 24;
-    const avgCloudCover = dayHours.cloud_cover.reduce((sum, cloud) => sum + cloud, 0) / 24;
-    const avgCloudCoverLow = dayHours.cloud_cover_low?.reduce((sum, cloud) => sum + cloud, 0) / 24 || 0;
-    const avgCloudCoverMid = dayHours.cloud_cover_mid?.reduce((sum, cloud) => sum + cloud, 0) / 24 || 0;
-    const avgCloudCoverHigh = dayHours.cloud_cover_high?.reduce((sum, cloud) => sum + cloud, 0) / 24 || 0;
-    const avgVisibility = dayHours.visibility.reduce((sum, vis) => sum + vis, 0) / 24;
-    const avgWindSpeed = dayHours.wind_speed.reduce((sum, wind) => sum + wind, 0) / 24;
-    
-    // Get most common weather code for the day
-    const weatherCodeCounts = {};
-    dayHours.weather_code.forEach(code => {
-      weatherCodeCounts[code] = (weatherCodeCounts[code] || 0) + 1;
-    });
-    const mostCommonWeatherCode = Object.keys(weatherCodeCounts).reduce((a, b) => 
-      weatherCodeCounts[a] > weatherCodeCounts[b] ? a : b
-    );
-    
-    // Get cloud type and height from weather code
-    const cloudInfo = getCloudTypeFromWeatherCode(parseInt(mostCommonWeatherCode));
-    
-    // Create weather data for scoring using the proper structure
-    const weatherForScoring = {
-      cloud_type: cloudInfo.type,
-      cloud_coverage: avgCloudCover,
-      cloud_coverage_low: avgCloudCoverLow,
-      cloud_coverage_mid: avgCloudCoverMid,
-      cloud_coverage_high: avgCloudCoverHigh,
-      cloud_height_km: cloudInfo.height,
-      precipitation_chance: avgPrecipitation,
-      humidity: avgHumidity,
-      air_quality_index: 50, // Default AQI since we don't have air quality data
-      visibility: avgVisibility,
-      wind_speed: avgWindSpeed
-    };
-    
-    // Calculate sunset score using Open-Meteo cloud cover data
-    const scoreResult = getSunsetQualityScore(weatherForScoring);
-    
-    // Format sunset time
-    const sunsetTime = apiData.daily.sunset[i] ? 
-      new Date(apiData.daily.sunset[i]).toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-      }) : '18:00';
-    
-    // Get day of week
-    const dayOfWeek = new Date(apiData.daily.time[i]).toLocaleDateString('en-US', { 
-      weekday: 'short' 
-    });
-    
-    days.push({
-      date: apiData.daily.time[i],
-      day_of_week: dayOfWeek,
-      weather_code: apiData.daily.weather_code[i],
-      temperature_max: apiData.daily.temperature_2m_max[i],
-      temperature_min: apiData.daily.temperature_2m_min[i],
-      sunset: apiData.daily.sunset[i],
-      sunrise: apiData.daily.sunrise[i],
-      sunset_time: sunsetTime,
-      sunset_score: scoreResult.score,
-      conditions: scoreResult.conditions,
-      cloud_coverage: avgCloudCover,
-      humidity: avgHumidity,
-      precipitation_chance: avgPrecipitation,
-      visibility: avgVisibility,
-      wind_speed: avgWindSpeed
-    });
+    // Process day data using ACTUAL SUNSET HOUR CONDITIONS
+    const dayData = processDayData(apiData, i, apiData.hourly);
+    days.push(dayData);
   }
   
   return {
@@ -179,20 +158,30 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
   const year = new Date().getFullYear();
   const today = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
   
+  console.log('🔍 Fetching Historical Weather Data:', {
+    latitude,
+    longitude,
+    year,
+    today,
+    startDate: `${year}-01-01`,
+    endDate: today
+  });
+  
   // NOTE: Current plan (Hobbyist) doesn't include historical API access
   // Using free Archive API - may hit rate limits
   // To upgrade: https://open-meteo.com/en/pricing (Professional plan)
   const apiKey = ''; // Not using API key for historical data (not included in plan)
-  const apiKeyParam = '';
   
-  const url = `${API_CONFIG.OPEN_METEO.ARCHIVE}?` +
-    `latitude=${latitude}&` +
-    `longitude=${longitude}&` +
-    `start_date=${year}-01-01&` +
-    `end_date=${today}&` +
-    `hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,wind_speed_10m&` +
-    `daily=weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise&` +
-    `timezone=auto${apiKeyParam}`;
+  const url = buildHistoricalUrl(
+    'https://archive-api.open-meteo.com/v1/archive',
+    latitude,
+    longitude,
+    `${year}-01-01`,
+    today,
+    apiKey
+  );
+  
+  console.log('🌐 Historical API URL:', url);
   
   const response = await fetch(url, {
     method: 'GET',
@@ -203,11 +192,25 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
     credentials: 'omit'
   });
   
+  console.log('📡 Historical API Response:', {
+    status: response.status,
+    ok: response.ok,
+    statusText: response.statusText
+  });
+  
   if (!response.ok) {
-    throw new Error(`Historical weather data fetch failed: ${response.status}`);
+    const errorText = await response.text();
+    console.error('❌ Historical API Error:', errorText);
+    throw new Error(`Historical weather data fetch failed: ${response.status} - ${errorText}`);
   }
   
   const data = await response.json();
+  console.log('📊 Historical API Data:', {
+    hasDaily: !!data.daily,
+    hasHourly: !!data.hourly,
+    dailyLength: data.daily?.time?.length,
+    hourlyLength: data.hourly?.time?.length
+  });
   return data;
 };
 
@@ -226,18 +229,18 @@ export const fetchHistoricalAirQualityData = async (latitude, longitude) => {
   
   // Add API key if using Open-Meteo Commercial (set in environment variable)
   const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
-  const apiKeyParam = apiKey ? `&apikey=${apiKey}` : '';
   
   // Use customer API URL if API key is provided
   const baseUrl = getAirQualityUrl(apiKey);
   
-  const url = `${baseUrl}?` +
-    `latitude=${latitude}&` +
-    `longitude=${longitude}&` +
-    `start_date=${startDate}&` +
-    `end_date=${endDate}&` +
-    `hourly=us_aqi&` +
-    `timezone=auto${apiKeyParam}`;
+  const url = buildAirQualityUrl(
+    baseUrl,
+    latitude,
+    longitude,
+    startDate,
+    endDate,
+    apiKey
+  );
   
   const response = await fetch(url);
   
