@@ -85,7 +85,7 @@ const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
 
         <div className="w-full max-w-7xl space-y-3 sm:space-y-4 backdrop-blur-xl bg-black/30 rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-6 lg:p-8 shadow-2xl border border-white/20">
           <div className="text-center">
-            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold text-white drop-shadow-lg">
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-thin text-white drop-shadow-lg">
               {forecast.location}
             </h2>
           </div>
@@ -114,7 +114,7 @@ const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
             <div className="flex flex-col lg:flex-row items-center justify-center gap-4 sm:gap-6 md:gap-8">
               {/* Scoring System */}
               <div className="flex flex-col items-center">
-                <h3 className="text-xs sm:text-sm font-medium text-white/80 mb-6 sm:mb-8 text-center">Scoring System</h3>
+                <h3 className="text-xs sm:text-sm font-bold text-white/80 mb-6 sm:mb-8 text-center">Scoring System</h3>
                         <div className="flex items-center justify-center">
                           <div className="relative w-24 sm:w-32 md:w-40 h-2 sm:h-3 rounded-full bg-gradient-to-r from-gray-500 via-amber-500 via-orange-500 via-pink-500 to-rose-500 mt-2">
                             {/* Score markers - removed left and right edges */}
@@ -123,11 +123,11 @@ const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
                             <div className="absolute left-3/4 top-0 w-px h-full bg-white/50"></div>
 
                             {/* Score numbers */}
-                            <div className="absolute -top-5 sm:-top-6 left-0 text-white/60 text-[10px] sm:text-xs">0</div>
-                            <div className="absolute -top-5 sm:-top-6 left-1/4 transform -translate-x-1/2 text-white/60 text-[10px] sm:text-xs">25</div>
-                            <div className="absolute -top-5 sm:-top-6 left-1/2 transform -translate-x-1/2 text-white/60 text-[10px] sm:text-xs">50</div>
-                            <div className="absolute -top-5 sm:-top-6 left-3/4 transform -translate-x-1/2 text-white/60 text-[10px] sm:text-xs">75</div>
-                            <div className="absolute -top-5 sm:-top-6 right-0 text-white/60 text-[10px] sm:text-xs">100</div>
+                            <div className="absolute -top-5 sm:-top-6 left-0 text-white/60 text-[10px] sm:text-xs font-light">0</div>
+                            <div className="absolute -top-5 sm:-top-6 left-1/4 transform -translate-x-1/2 text-white/60 text-[10px] sm:text-xs font-light">25</div>
+                            <div className="absolute -top-5 sm:-top-6 left-1/2 transform -translate-x-1/2 text-white/60 text-[10px] sm:text-xs font-light">50</div>
+                            <div className="absolute -top-5 sm:-top-6 left-3/4 transform -translate-x-1/2 text-white/60 text-[10px] sm:text-xs font-light">75</div>
+                            <div className="absolute -top-5 sm:-top-6 right-0 text-white/60 text-[10px] sm:text-xs font-light">100</div>
                           </div>
                         </div>
               </div>
@@ -139,7 +139,7 @@ const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
               <div className="flex flex-col items-center max-w-3xl px-4">
                 <h3 className="text-sm sm:text-base md:text-lg font-bold text-white mb-2 text-center">How Weather Affects Sunset</h3>
                 <div className="text-center">
-                  <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-white/70 leading-tight">
+                  <p className="text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs text-white/70 leading-tight font-light">
                     Our scientific algorithm analyzes real atmospheric data including cloud altitude, <br>
                     </br>humidity, air quality, and precipitation to predict sunset quality.
                   </p>

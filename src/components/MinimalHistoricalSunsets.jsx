@@ -28,7 +28,7 @@ const MinimalHistoricalSunsets = memo(({
         <motion.h3
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-sm font-medium mb-3 relative inline-block"
+          className="text-sm font-bold mb-3 relative inline-block"
         >
           <span className="relative">
             <motion.span
@@ -93,7 +93,7 @@ const MinimalHistoricalSunsets = memo(({
     <div className="text-center">
       {/* Year's Best Sunsets */}
       <div>
-        <h3 className="text-xs sm:text-sm font-medium text-white mb-2 sm:mb-3">Year's Best Sunsets</h3>
+        <h3 className="text-xs sm:text-sm font-bold text-white mb-2 sm:mb-3">Year's Best Sunsets</h3>
         <div className="relative flex flex-col">
           {/* Black background bar - perfectly aligned with circles row */}
           <div className="absolute top-0 left-1 sm:left-2 right-1 sm:right-2 h-7 sm:h-8 bg-black/50 rounded-lg z-0"></div>
@@ -113,14 +113,14 @@ const MinimalHistoricalSunsets = memo(({
                         {/* Circle row - exact h-7/h-8 to match background bar, using flex to center */}
                         <div className="flex items-center justify-center space-x-0.5 sm:space-x-1 h-7 sm:h-8 w-full">
                           <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${colors.circle}`}></div>
-                          <span className={`text-[10px] sm:text-xs ${colors.text}`}>
+                          <span className={`text-[10px] sm:text-xs font-bold ${colors.text}`}>
                             {score}
                           </span>
                         </div>
-                        <div className="text-white text-[10px] sm:text-xs">
+                        <div className="text-white text-[10px] sm:text-xs font-light">
                           {new Date(sunset.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
-                        <div className="text-white text-[10px] sm:text-xs">
+                        <div className="text-white text-[10px] sm:text-xs font-light">
                           {sunset.sunset_time ? sunset.sunset_time.split('T')[1]?.split(':').slice(0, 2).join(':') || sunset.sunset_time : '18:30'}
                         </div>
                       </motion.div>

@@ -17,10 +17,10 @@ const DayCard = memo(({ day }) => {
         <div className="p-2 sm:p-3 flex flex-col items-center space-y-1.5 sm:space-y-2">
           {/* Date Header - More Compact */}
           <div className="text-center pb-1 border-b border-gray-200 min-h-[32px] sm:min-h-[40px] flex flex-col justify-center w-full">
-            <p className="text-gray-700 text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+            <p className="text-gray-700 text-[10px] sm:text-xs font-bold uppercase tracking-wide">
               {day.day_of_week}
             </p>
-            <p className="text-gray-900 text-[10px] sm:text-xs font-semibold mt-0.5 sm:mt-1">
+            <p className="text-gray-900 text-[10px] sm:text-xs font-light mt-0.5 sm:mt-1">
               {day.date}
             </p>
           </div>
@@ -35,7 +35,7 @@ const DayCard = memo(({ day }) => {
                 {day.sunset_score}
               </span>
             </div>
-            <p className="text-[10px] sm:text-xs font-semibold text-gray-700 text-center mt-1">
+            <p className="text-[10px] sm:text-xs font-medium text-gray-700 text-center mt-1">
               {scoreColors.label}
             </p>
           </div>
@@ -48,7 +48,7 @@ const DayCard = memo(({ day }) => {
           {/* Sunset Time */}
           <div className="flex items-center justify-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-gradient-to-r from-orange-500 to-pink-500 w-3/4 mx-auto">
             <Sun className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white flex-shrink-0" aria-hidden="true" />
-            <span className="text-white text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+            <span className="text-white text-[10px] sm:text-xs font-bold uppercase tracking-wide">
               {day.sunset_time}
             </span>
           </div>

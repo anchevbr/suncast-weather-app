@@ -99,13 +99,13 @@ const Home = () => {
             <div className="space-y-4 sm:space-y-6">
               <div className="text-center space-y-2">
                 <h1 
-                  className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-wide bg-gradient-to-r from-orange-400 via-pink-500 to-red-500 bg-clip-text text-transparent" 
+                  className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-wide bg-gradient-to-r from-orange-400 via-pink-500 to-red-500 bg-clip-text text-transparent" 
                   style={{ letterSpacing: '-0.02em' }}
                 >
                   Golden Hour
                 </h1>
                 <p 
-                  className="text-xs sm:text-sm md:text-base text-white/80 font-normal max-w-md mx-auto leading-relaxed px-4"
+                  className="text-xs sm:text-sm md:text-base text-white/80 font-light max-w-md mx-auto leading-relaxed px-4"
                 >
                   Will tonight's sunset be spectacular?
                 </p>
@@ -131,7 +131,7 @@ const Home = () => {
                   {!isLoading ? (
                     <motion.button
                       onClick={onGetCurrentLocation}
-                      className="flex items-center space-x-1 sm:space-x-2 hover:text-white transition-colors duration-200"
+                      className="flex items-center space-x-1 sm:space-x-2 hover:text-white transition-colors duration-200 font-light"
                       aria-label="Use current location"
                       whileHover={{ 
                         scale: 1.05, 
@@ -147,7 +147,7 @@ const Home = () => {
                       <span>Use current location</span>
                     </motion.button>
                   ) : (
-                    <div className="text-sm font-medium bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent animate-pulse">
+                    <div className="text-sm font-bold bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent animate-pulse">
                       Loading data...
                     </div>
                   )}
