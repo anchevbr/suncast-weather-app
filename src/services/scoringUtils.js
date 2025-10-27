@@ -3,6 +3,32 @@
  * Extracted from scoringService.js for better maintainability and testability
  */
 
+// High cloud coverage scoring ranges
+const HIGH_CLOUD_RANGES = [
+  { min: 80, max: 95, score: 40 },
+  { min: 60, max: 80, score: 35 },
+  { min: 40, max: 60, score: 30 },
+  { min: 25, max: 40, score: 25 },
+  { min: 15, max: 25, score: 20 },
+  { min: 0, max: 15, score: 15 }
+];
+
+// Mid cloud coverage scoring ranges
+const MID_CLOUD_RANGES = [
+  { min: 20, max: 40, score: 15 },
+  { min: 10, max: 20, score: 12 },
+  { min: 40, max: 60, score: 8 },
+  { min: 0, max: 10, score: 10 }
+];
+
+// Low cloud coverage scoring ranges
+const LOW_CLOUD_RANGES = [
+  { min: 60, max: 100, score: -20 },
+  { min: 40, max: 60, score: -8 },
+  { min: 20, max: 40, score: 3 },
+  { min: 0, max: 20, score: 5 }
+];
+
 /**
  * Calculate cloud altitude scoring (50 points max)
  * @param {Object} cloudData - Cloud coverage data by altitude
@@ -13,47 +39,27 @@ export const calculateCloudScore = (cloudData) => {
   let cloudScore = 0;
   
   // High clouds (>8km) are scientifically optimal for sunset colors
-  // CORRECTED: More high clouds = better sunset colors (up to reasonable limit)
   if (cloudCoverageHigh > 0) {
-    if (cloudCoverageHigh >= 80 && cloudCoverageHigh <= 95) {
-      cloudScore += 40; // EXCELLENT high cloud coverage - perfect for sunsets!
-    } else if (cloudCoverageHigh >= 60 && cloudCoverageHigh < 80) {
-      cloudScore += 35; // Very good high cloud coverage
-    } else if (cloudCoverageHigh >= 40 && cloudCoverageHigh < 60) {
-      cloudScore += 30; // Good high cloud coverage
-    } else if (cloudCoverageHigh >= 25 && cloudCoverageHigh < 40) {
-      cloudScore += 25; // Moderate high cloud coverage
-    } else if (cloudCoverageHigh >= 15 && cloudCoverageHigh < 25) {
-      cloudScore += 20; // Light high cloud coverage
-    } else {
-      cloudScore += 15; // Very light high clouds
-    }
+    const range = HIGH_CLOUD_RANGES.find(r => 
+      cloudCoverageHigh >= r.min && cloudCoverageHigh < r.max
+    );
+    cloudScore += range?.score || 15;
   }
   
   // Mid-level clouds (3-8km) provide moderate color enhancement
   if (cloudCoverageMid > 0) {
-    if (cloudCoverageMid >= 20 && cloudCoverageMid <= 40) {
-      cloudScore += 15; // Good mid-level clouds
-    } else if (cloudCoverageMid >= 10 && cloudCoverageMid < 20) {
-      cloudScore += 12; // Light mid-level clouds
-    } else if (cloudCoverageMid > 40 && cloudCoverageMid <= 60) {
-      cloudScore += 8; // Heavy mid-level clouds
-    } else {
-      cloudScore += 10; // Minimal mid-level clouds
-    }
+    const range = MID_CLOUD_RANGES.find(r => 
+      cloudCoverageMid >= r.min && cloudCoverageMid < r.max
+    );
+    cloudScore += range?.score || 10;
   }
   
   // Low clouds (0-3km) typically block sunlight and reduce color intensity
   if (cloudCoverageLow > 0) {
-    if (cloudCoverageLow >= 60) {
-      cloudScore -= 20; // Heavy low clouds block sunlight
-    } else if (cloudCoverageLow >= 40 && cloudCoverageLow < 60) {
-      cloudScore -= 8; // Moderate low clouds reduce colors
-    } else if (cloudCoverageLow >= 20 && cloudCoverageLow < 40) {
-      cloudScore += 3; // Light low clouds can create silhouettes
-    } else {
-      cloudScore += 5; // Minimal low clouds, slight enhancement
-    }
+    const range = LOW_CLOUD_RANGES.find(r => 
+      cloudCoverageLow >= r.min && cloudCoverageLow < r.max
+    );
+    cloudScore += range?.score || 5;
   }
   
   // Clear skies bonus - when all cloud levels are minimal
@@ -65,6 +71,43 @@ export const calculateCloudScore = (cloudData) => {
   return Math.min(50, Math.max(0, cloudScore));
 };
 
+// Precipitation scoring ranges
+const PRECIPITATION_RANGES = [
+  { min: 60, max: 100, score: -20 },
+  { min: 40, max: 60, score: -12 },
+  { min: 20, max: 40, score: -6 },
+  { min: 5, max: 20, score: -2 },
+  { min: 0, max: 5, score: 0 }
+];
+
+// Humidity scoring ranges
+const HUMIDITY_RANGES = [
+  { min: 40, max: 70, score: 10 },
+  { min: 30, max: 40, score: 8 },
+  { min: 70, max: 85, score: 5 },
+  { min: 85, max: 100, score: -3 },
+  { min: 0, max: 30, score: 7 }
+];
+
+// Air quality scoring ranges
+const AQI_RANGES = [
+  { min: 0, max: 25, score: 10 },
+  { min: 25, max: 50, score: 8 },
+  { min: 50, max: 75, score: 5 },
+  { min: 75, max: 100, score: 2 },
+  { min: 100, max: 500, score: -5 }
+];
+
+// Visibility scoring ranges
+const VISIBILITY_RANGES = [
+  { min: 20000, max: 100000, score: 8 },
+  { min: 15000, max: 20000, score: 6 },
+  { min: 10000, max: 15000, score: 4 },
+  { min: 5000, max: 10000, score: 2 },
+  { min: 2000, max: 5000, score: -3 },
+  { min: 0, max: 2000, score: -8 }
+];
+
 /**
  * Calculate atmospheric conditions scoring (30 points max)
  * @param {Object} atmosphericData - Atmospheric conditions data
@@ -75,56 +118,28 @@ export const calculateAtmosphericScore = (atmosphericData) => {
   let atmosphericScore = 0;
   
   // Precipitation severely impacts sunset quality
-  if (precipChance >= 60) {
-    atmosphericScore -= 20; // Heavy precipitation
-  } else if (precipChance >= 40) {
-    atmosphericScore -= 12; // Moderate precipitation
-  } else if (precipChance >= 20) {
-    atmosphericScore -= 6; // Light precipitation
-  } else if (precipChance >= 5) {
-    atmosphericScore -= 2; // Slight chance of precipitation
-  }
+  const precipRange = PRECIPITATION_RANGES.find(r => 
+    precipChance >= r.min && precipChance < r.max
+  );
+  atmosphericScore += precipRange?.score || 0;
   
   // Humidity affects color intensity through atmospheric scattering
-  if (humidity >= 40 && humidity <= 70) {
-    atmosphericScore += 10; // Optimal humidity
-  } else if (humidity >= 30 && humidity < 40) {
-    atmosphericScore += 8; // Lower humidity, good clarity
-  } else if (humidity >= 70 && humidity <= 85) {
-    atmosphericScore += 5; // Higher humidity, slightly muted
-  } else if (humidity > 85) {
-    atmosphericScore -= 3; // Very high humidity
-  } else if (humidity < 30) {
-    atmosphericScore += 7; // Very low humidity, excellent clarity
-  }
+  const humidityRange = HUMIDITY_RANGES.find(r => 
+    humidity >= r.min && humidity < r.max
+  );
+  atmosphericScore += humidityRange?.score || 7;
   
   // Air quality impacts color purity and visibility
-  if (aqi <= 25) {
-    atmosphericScore += 10; // Excellent air quality
-  } else if (aqi <= 50) {
-    atmosphericScore += 8; // Good air quality
-  } else if (aqi <= 75) {
-    atmosphericScore += 5; // Moderate air quality
-  } else if (aqi <= 100) {
-    atmosphericScore += 2; // Poor air quality
-  } else {
-    atmosphericScore -= 5; // Very poor air quality
-  }
+  const aqiRange = AQI_RANGES.find(r => 
+    aqi >= r.min && aqi <= r.max
+  );
+  atmosphericScore += aqiRange?.score || 2;
   
   // Visibility directly affects sunset clarity
-  if (visibility >= 20000) {
-    atmosphericScore += 8; // Excellent visibility
-  } else if (visibility >= 15000) {
-    atmosphericScore += 6; // Very good visibility
-  } else if (visibility >= 10000) {
-    atmosphericScore += 4; // Good visibility
-  } else if (visibility >= 5000) {
-    atmosphericScore += 2; // Moderate visibility
-  } else if (visibility >= 2000) {
-    atmosphericScore -= 3; // Poor visibility
-  } else {
-    atmosphericScore -= 8; // Very poor visibility
-  }
+  const visRange = VISIBILITY_RANGES.find(r => 
+    visibility >= r.min && visibility < r.max
+  );
+  atmosphericScore += visRange?.score || 2;
   
   // Cap atmospheric score at 30 points maximum
   return Math.min(30, Math.max(-20, atmosphericScore));

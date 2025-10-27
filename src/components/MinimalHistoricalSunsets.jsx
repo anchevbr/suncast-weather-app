@@ -1,7 +1,8 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import PropTypes from 'prop-types';
 import { motion } from "framer-motion";
 import { getHistoricalColors } from "../utils/colorPalette";
+import { logger } from "../utils/logger.js";
 
 // Static array for loading animation bars - moved outside component to prevent recreation
 const LOADING_BARS = Array.from({ length: 10 }, (_, i) => i);
@@ -11,7 +12,7 @@ const MinimalHistoricalSunsets = memo(({
   isLoading
 }) => {
   // DEBUG: Log what the component receives
-  console.log('🎯 MinimalHistoricalSunsets received:', {
+  logger.debug('🎯 MinimalHistoricalSunsets received:', {
     isLoading: isLoading,
     hasHistoricalData: !!historicalData,
     hasTop10: !!historicalData?.top10,

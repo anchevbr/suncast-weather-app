@@ -61,36 +61,3 @@ export const getSunsetQualityScore = (weather) => {
     conditions: conditions
   };
 };
-
-/**
- * Simplified cloud type mapping for weather codes (minimal usage now)
- * @param {number} code - WMO weather interpretation code
- * @returns {Object} - {type: string, height: number}
- */
-export const getCloudTypeFromWeatherCode = (code) => {
-  const weatherTypes = {
-    0: { type: 'Clear', height: 0 },
-    1: { type: 'Mainly Clear', height: 0 },
-    2: { type: 'Partly Cloudy', height: 4 },
-    3: { type: 'Overcast', height: 3 },
-    45: { type: 'Fog', height: 0.5 },
-    48: { type: 'Fog', height: 0.5 },
-    51: { type: 'Drizzle', height: 2 },
-    53: { type: 'Drizzle', height: 2 },
-    55: { type: 'Drizzle', height: 2 },
-    61: { type: 'Rain', height: 2 },
-    63: { type: 'Rain', height: 2 },
-    65: { type: 'Rain', height: 2 },
-    71: { type: 'Snow', height: 3 },
-    73: { type: 'Snow', height: 3 },
-    75: { type: 'Snow', height: 3 },
-    80: { type: 'Rain Showers', height: 4 },
-    81: { type: 'Rain Showers', height: 4 },
-    82: { type: 'Rain Showers', height: 4 },
-    95: { type: 'Thunderstorm', height: 8 },
-    96: { type: 'Thunderstorm with Hail', height: 10 },
-    99: { type: 'Thunderstorm with Hail', height: 10 }
-  };
-  
-  return weatherTypes[code] || { type: 'Partly Cloudy', height: 3 };
-};

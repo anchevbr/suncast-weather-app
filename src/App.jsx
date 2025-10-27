@@ -1,4 +1,3 @@
-import React from 'react'
 import Home from './Home.jsx'
 import ErrorBoundary from './components/ErrorBoundary'
 

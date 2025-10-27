@@ -1,6 +1,6 @@
-import React, { memo, useMemo } from "react";
+import { memo, useMemo } from "react";
 import PropTypes from 'prop-types';
-import { interpolateRGB, rgbToString } from "../../utils/colorUtils";
+import { interpolateRGB } from "../../utils/colorUtils";
 import { VISUAL_CONSTANTS } from "../../constants/app";
 
 /**

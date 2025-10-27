@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import PropTypes from 'prop-types';
 import { MapPin, Loader2 } from 'lucide-react';
 import { useGeocoding } from '../hooks/useGeocoding';

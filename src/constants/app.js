@@ -13,10 +13,18 @@ export const GEOCODING_CONSTANTS = {
 // Weather & Sunset Configuration
 export const SUNSET_CONSTANTS = {
   APPROXIMATE_SUNSET_HOUR: 18, // Used for historical data when exact time unavailable
-  DEFAULT_AQI: 50, // Default air quality index when data unavailable
-  DEFAULT_VISIBILITY: 10000, // Default visibility in meters
-  DEFAULT_WIND_SPEED: 10, // Default wind speed in km/h
-  DEFAULT_HUMIDITY: 50, // Default humidity percentage
+  
+  // Default values when API data is unavailable
+  // These are chosen as "neutral" values that won't artificially inflate/deflate scores
+  DEFAULT_AQI: 50,              // Moderate air quality (AQI 50 = acceptable)
+  DEFAULT_VISIBILITY: 10000,    // 10km = typical clear day visibility
+  DEFAULT_WIND_SPEED: 10,       // 10 km/h = light breeze (doesn't affect scoring much)
+  DEFAULT_HUMIDITY: 50,         // 50% = mid-range humidity (neutral for scoring)
+  
+  // Precision notes:
+  // - Sunset hour uses CLOSEST hour (rounds to nearest)
+  // - AQI matches by timestamp when available (not just index)
+  // - All times use API's timezone='auto' for location accuracy
 };
 
 

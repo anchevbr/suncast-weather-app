@@ -5,50 +5,7 @@
 
 import { fetchHistoricalWeatherData, fetchHistoricalAirQualityData } from './apiService.js';
 import { processHistoricalSunsetData, getTop10Sunsets, getScoreStatistics } from './dataProcessingService.js';
-
-/**
- * Fetch and process historical sunset data for a location (current year only)
- * @param {Object} location - Location object with lat, lon, name
- * @returns {Promise<Object>} - Complete historical forecast object
- */
-export const fetchHistoricalForecast = async (location) => {
-  const year = new Date().getFullYear();
-  
-  try {
-    // Fetch historical weather data
-    const weatherData = await fetchHistoricalWeatherData(location.latitude, location.longitude);
-    
-    // Fetch historical air quality data (optional)
-    const aqiData = await fetchHistoricalAirQualityData(location.latitude, location.longitude);
-    
-    // Process the data to get daily sunset scores
-    const processedData = processHistoricalSunsetData(weatherData, aqiData, location, year);
-    
-    // Get top 10 sunsets and statistics
-    const top10 = getTop10Sunsets(processedData);
-    const statistics = getScoreStatistics(processedData);
-    
-    // DEBUG: Log historical service result
-    console.log('📊 Historical Service Result:', {
-      processedDataLength: processedData.length,
-      top10Length: top10.length,
-      sampleTop10: top10.slice(0, 3),
-      statistics: statistics
-    });
-    
-    return {
-      location,
-      year,
-      days: processedData,
-      top10,
-      statistics,
-      lastUpdated: new Date().toISOString()
-    };
-    
-  } catch (error) {
-    throw error;
-  }
-};
+import { logger } from '../utils/logger.js';
 
 /**
  * Fetch and process historical sunset data with progress updates
@@ -81,7 +38,7 @@ export const fetchHistoricalForecastWithProgress = async (location, onProgress) 
     const statistics = getScoreStatistics(processedData);
     
     // DEBUG: Log historical service result (progress version)
-    console.log('📊 Historical Service Result (Progress):', {
+    logger.debug('📊 Historical Service Result (Progress):', {
       processedDataLength: processedData.length,
       top10Length: top10.length,
       sampleTop10: top10.slice(0, 3),

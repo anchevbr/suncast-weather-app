@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { MapPin } from "lucide-react";
 import { motion } from "framer-motion";
 import LocationAutocomplete from './components/LocationAutocomplete';
@@ -36,23 +36,19 @@ const Home = () => {
 
   // Handle location selection with forecast setting
   const onLocationSelect = useCallback(async (locationData) => {
-    try {
-      const result = await handleLocationSelect(locationData, enableScrollSnap);
+    const result = await handleLocationSelect(locationData, enableScrollSnap);
+    if (result) {
       setForecast(result.forecast);
       setIsDataLoaded(false); // Reset for new location
-    } catch (error) {
-      // Error already handled in hook
     }
   }, [handleLocationSelect, enableScrollSnap]);
 
   // Handle current location with forecast setting
   const onGetCurrentLocation = useCallback(async () => {
-    try {
-      const result = await handleGetCurrentLocation(enableScrollSnap);
+    const result = await handleGetCurrentLocation(enableScrollSnap);
+    if (result) {
       setForecast(result.forecast);
       setIsDataLoaded(false);
-    } catch (error) {
-      // Error already handled in hook
     }
   }, [handleGetCurrentLocation, enableScrollSnap]);
 
@@ -173,8 +169,8 @@ const Home = () => {
         </div>
         </div>
 
-      {/* Mountain silhouettes - scrolls with horizontal navigation */}
-      <Mountains />
+      {/* Mountain silhouettes - scrolls with horizontal navigation with parallax effect */}
+      <Mountains scrollProgress={scrollProgress} />
 
       {/* Results Section - Always present in DOM for smooth scrolling */}
       <div 

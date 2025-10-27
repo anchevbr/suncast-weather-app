@@ -3,7 +3,7 @@
  * Extracted from apiService.js for better maintainability and testability
  */
 
-import { getCloudTypeFromWeatherCode, getSunsetQualityScore } from './scoringService.js';
+import { processSunsetDay } from './sunsetDataProcessor.js';
 
 /**
  * Parse location query to extract coordinates and name
@@ -32,133 +32,47 @@ export const parseLocationQuery = (locationQuery, customLocationName = null) => 
 
 /**
  * Process daily forecast data with scoring using ACTUAL SUNSET HOUR CONDITIONS
+ * Now uses unified sunset processing module for consistency
  * @param {Object} apiData - Raw API data
  * @param {number} dayIndex - Day index
  * @param {Object} hourlyData - Hourly weather data
+ * @param {Object} aqiData - Optional air quality data
  * @returns {Object} Processed day data
  */
 export const processDayData = (apiData, dayIndex, hourlyData, aqiData = null) => {
-  // Get sunset time from daily data
-  const sunsetDateTime = apiData.daily.sunset[dayIndex];
-  const sunsetTime = sunsetDateTime ? 
-    new Date(sunsetDateTime).toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false 
-    }) : '18:00';
-  
-  // Calculate sunset hour index in hourly data
-  // Round to nearest hour for sunset time (same as historical processing)
-  let sunsetHour = 18;
-  if (sunsetDateTime) {
-    const sunsetDate = new Date(sunsetDateTime);
-    const minutes = sunsetDate.getMinutes();
-    // If 30+ minutes past the hour, use next hour
-    sunsetHour = minutes >= 30 ? sunsetDate.getHours() + 1 : sunsetDate.getHours();
-  }
-  const sunsetHourIndex = (dayIndex * 24) + sunsetHour;
-  
-  // Get weather conditions AT THE ACTUAL SUNSET HOUR
-  const safeHourIndex = Math.min(sunsetHourIndex, (hourlyData.time?.length || 0) - 1);
-  
-  // DEBUG: Log sunset time and hour calculation
-  if (dayIndex < 3) { // Only log first 3 days to avoid spam
-    console.log(`📅 Live Forecast Day ${dayIndex + 1}:`, {
-      date: apiData.daily.time[dayIndex],
-      sunsetDateTime: sunsetDateTime,
-      sunsetTime: sunsetTime,
-      sunsetHour: sunsetHour,
-      sunsetHourIndex: sunsetHourIndex,
-      safeHourIndex: safeHourIndex,
-      hourlyDataLength: hourlyData.time?.length || 0
-    });
-  }
-  
-  const weatherCode = hourlyData.weather_code?.[safeHourIndex] || 0;
-  const cloudCoverage = hourlyData.cloud_cover?.[safeHourIndex] || 0;
-  const cloudCoverageLow = hourlyData.cloud_cover_low?.[safeHourIndex] || 0;
-  const cloudCoverageMid = hourlyData.cloud_cover_mid?.[safeHourIndex] || 0;
-  const cloudCoverageHigh = hourlyData.cloud_cover_high?.[safeHourIndex] || 0;
-  const humidity = hourlyData.relative_humidity_2m?.[safeHourIndex] || 50;
-  const precipChance = hourlyData.precipitation_probability?.[safeHourIndex] || 0;
-  const visibility = hourlyData.visibility?.[safeHourIndex] || 10000;
-  const windSpeed = hourlyData.wind_speed_10m?.[safeHourIndex] || 5;
-  
-  // Get AQI for sunset hour (same logic as historical)
-  let aqi = 50; // Default AQI
-  if (aqiData && aqiData.hourly && aqiData.hourly.us_aqi) {
-    aqi = aqiData.hourly.us_aqi[safeHourIndex] || 50;
-  }
-  
-  // DEBUG: Log sunset hour conditions
-  if (dayIndex < 3) { // Only log first 3 days to avoid spam
-    console.log(`🌅 Live Forecast Sunset Conditions Day ${dayIndex + 1}:`, {
-      weatherCode: weatherCode,
-      cloudCoverage: cloudCoverage,
-      cloudCoverageLow: cloudCoverageLow,
-      cloudCoverageMid: cloudCoverageMid,
-      cloudCoverageHigh: cloudCoverageHigh,
-      humidity: humidity,
-      precipChance: precipChance,
-      visibility: visibility,
-      windSpeed: windSpeed,
-      aqi: aqi
-    });
-  }
-  
-  // Get cloud type and height from weather code
-  const cloudInfo = getCloudTypeFromWeatherCode(weatherCode);
-  
-  // Create weather data for scoring using ACTUAL SUNSET HOUR CONDITIONS
-  const weatherForScoring = {
-    cloud_type: cloudInfo.type,
-    cloud_coverage: cloudCoverage,
-    cloud_coverage_low: cloudCoverageLow,
-    cloud_coverage_mid: cloudCoverageMid,
-    cloud_coverage_high: cloudCoverageHigh,
-    cloud_height_km: cloudInfo.height,
-    precipitation_chance: precipChance,
-    humidity: humidity,
-    air_quality_index: Math.round(aqi), // Use real AQI data (same as historical)
-    visibility: visibility,
-    wind_speed: windSpeed
-  };
-  
-  // Calculate sunset score using ACTUAL SUNSET HOUR CONDITIONS
-  const scoreResult = getSunsetQualityScore(weatherForScoring);
-  
-  // DEBUG: Log scoring result
-  if (dayIndex < 3) { // Only log first 3 days to avoid spam
-    console.log(`🎯 Live Forecast Scoring Result Day ${dayIndex + 1}:`, {
-      score: scoreResult.score,
-      conditions: scoreResult.conditions,
-      weatherForScoring: weatherForScoring
-    });
-  }
+  // Use unified sunset processing module
+  const sunsetData = processSunsetDay({
+    dayIndex,
+    dailyData: apiData.daily,
+    hourlyData,
+    aqiData,
+    dataType: 'forecast'
+  });
   
   // Get day of week
   const dayOfWeek = new Date(apiData.daily.time[dayIndex]).toLocaleDateString('en-US', { 
     weekday: 'short' 
   });
   
+  // Return complete day data
   return {
     date: apiData.daily.time[dayIndex],
     day_of_week: dayOfWeek,
-    weather_code: weatherCode,
+    weather_code: sunsetData.weatherCode,
     temperature_max: apiData.daily.temperature_2m_max[dayIndex],
     temperature_min: apiData.daily.temperature_2m_min[dayIndex],
     sunset: apiData.daily.sunset[dayIndex],
     sunrise: apiData.daily.sunrise[dayIndex],
-    sunset_time: sunsetTime,
-    sunset_score: scoreResult.score,
-    conditions: scoreResult.conditions,
-    cloud_coverage: cloudCoverage,
-    cloud_coverage_low: cloudCoverageLow,
-    cloud_coverage_mid: cloudCoverageMid,
-    cloud_coverage_high: cloudCoverageHigh,
-    humidity: humidity,
-    precipitation_chance: precipChance,
-    visibility: visibility,
-    wind_speed: windSpeed
+    sunset_time: sunsetData.sunsetTime,
+    sunset_score: sunsetData.sunsetScore,
+    conditions: sunsetData.conditions,
+    cloud_coverage: sunsetData.cloudCoverage,
+    cloud_coverage_low: sunsetData.cloudCoverageLow,
+    cloud_coverage_mid: sunsetData.cloudCoverageMid,
+    cloud_coverage_high: sunsetData.cloudCoverageHigh,
+    humidity: sunsetData.humidity,
+    precipitation_chance: sunsetData.precipChance,
+    visibility: sunsetData.visibility,
+    wind_speed: sunsetData.windSpeed
   };
 };

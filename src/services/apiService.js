@@ -5,84 +5,8 @@
 
 import { getForecastUrl, getAirQualityUrl } from '../config/api.js';
 import { parseLocationQuery, processDayData } from './forecastDataProcessor.js';
-
-/**
- * Build forecast API URL with proper parameter encoding
- * @param {string} baseUrl - Base API URL
- * @param {Object} coords - Coordinates object with latitude and longitude
- * @param {string} apiKey - Optional API key
- * @returns {string} Complete API URL
- */
-const buildForecastUrl = (baseUrl, coords, apiKey = '') => {
-  const params = new URLSearchParams({
-    latitude: coords.latitude,
-    longitude: coords.longitude,
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise',
-    hourly: 'temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,wind_speed_10m',
-    timezone: 'auto'
-  });
-  
-  if (apiKey) {
-    params.append('apikey', apiKey);
-  }
-  
-  return `${baseUrl}?${params.toString()}`;
-};
-
-/**
- * Build historical weather API URL with proper parameter encoding
- * @param {string} baseUrl - Base API URL
- * @param {number} latitude - Latitude coordinate
- * @param {number} longitude - Longitude coordinate
- * @param {string} startDate - Start date in YYYY-MM-DD format
- * @param {string} endDate - End date in YYYY-MM-DD format
- * @param {string} apiKey - Optional API key
- * @returns {string} Complete API URL
- */
-const buildHistoricalUrl = (baseUrl, latitude, longitude, startDate, endDate, apiKey = '') => {
-  const params = new URLSearchParams({
-    latitude,
-    longitude,
-    start_date: startDate,
-    end_date: endDate,
-    hourly: 'temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,wind_speed_10m',
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise',
-    timezone: 'auto'
-  });
-  
-  if (apiKey) {
-    params.append('apikey', apiKey);
-  }
-  
-  return `${baseUrl}?${params.toString()}`;
-};
-
-/**
- * Build air quality API URL with proper parameter encoding
- * @param {string} baseUrl - Base API URL
- * @param {number} latitude - Latitude coordinate
- * @param {number} longitude - Longitude coordinate
- * @param {string} startDate - Start date in YYYY-MM-DD format
- * @param {string} endDate - End date in YYYY-MM-DD format
- * @param {string} apiKey - Optional API key
- * @returns {string} Complete API URL
- */
-const buildAirQualityUrl = (baseUrl, latitude, longitude, startDate, endDate, apiKey = '') => {
-  const params = new URLSearchParams({
-    latitude,
-    longitude,
-    start_date: startDate,
-    end_date: endDate,
-    hourly: 'us_aqi',
-    timezone: 'auto'
-  });
-  
-  if (apiKey) {
-    params.append('apikey', apiKey);
-  }
-  
-  return `${baseUrl}?${params.toString()}`;
-};
+import { buildForecastUrl, buildHistoricalUrl, buildAirQualityUrl } from '../utils/apiUrlBuilder.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Fetch live forecast data from Open-Meteo API
@@ -115,24 +39,29 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
   
   const apiData = await response.json();
   
-  // Step 3: Fetch air quality data (same as historical)
+  // Step 3: Fetch air quality data for 7 days (matching forecast range)
   let aqiData = null;
   try {
     const today = new Date().toISOString().split('T')[0];
+    // Calculate end date (7 days from today)
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 6);
+    const endDateStr = endDate.toISOString().split('T')[0];
+    
     const aqiBaseUrl = getAirQualityUrl(apiKey);
     const aqiUrl = buildAirQualityUrl(
       aqiBaseUrl,
       coords.latitude,
       coords.longitude,
       today,
-      today,
+      endDateStr, // 7 days of AQI data
       apiKey
     );
     
     const aqiResponse = await fetch(aqiUrl);
     if (aqiResponse.ok) {
       aqiData = await aqiResponse.json();
-      console.log('🌫️ Live Forecast AQI Data:', {
+      logger.debug('🌫️ Live Forecast AQI Data:', {
         hasData: !!aqiData,
         hasHourly: !!aqiData?.hourly,
         hasUsAqi: !!aqiData?.hourly?.us_aqi,
@@ -140,31 +69,76 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
       });
     }
   } catch (error) {
-    console.log('⚠️ Could not fetch AQI data for live forecast:', error);
+    logger.debug('⚠️ Could not fetch AQI data for live forecast:', error);
   }
-  
-  // DEBUG: Log overall API data structure
-  console.log(`📊 Live Forecast API Data Structure:`, {
-    location: locationName,
-    coords: coords,
-    hasDailyData: !!apiData.daily,
-    hasHourlyData: !!apiData.hourly,
-    dailyTimeLength: apiData.daily?.time?.length,
-    hourlyTimeLength: apiData.hourly?.time?.length,
-    hasSunsetData: !!apiData.daily?.sunset,
-    firstSunsetTime: apiData.daily?.sunset?.[0],
-    sampleHourlyTime: apiData.hourly?.time?.slice(0, 3),
-    hasAqiData: !!aqiData
-  });
   
   // Step 4: Process the data using utility functions (with AQI data)
   const days = [];
-  for (let i = 0; i < apiData.daily.time.length; i++) {
-    // Process day data using ACTUAL SUNSET HOUR CONDITIONS with AQI
-    const dayData = processDayData(apiData, i, apiData.hourly, aqiData);
-    days.push(dayData);
+  
+  // Check if today's sunset has passed - if so, we should use historical data for Day 0
+  const now = new Date();
+  const todayDateStr = now.toISOString().split('T')[0];
+  const firstDayDate = apiData.daily.time[0];
+  const isTodayFirstDay = firstDayDate === todayDateStr;
+  const todaySunsetTime = isTodayFirstDay ? new Date(apiData.daily.sunset[0]) : null;
+  const sunsetHasPassed = todaySunsetTime && now > todaySunsetTime;
+  
+  // If sunset has passed today, fetch historical data for today only
+  let historicalTodayData = null;
+  if (sunsetHasPassed) {
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('⚠️  SUNSET HAS PASSED - SWITCHING TO HISTORICAL DATA');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('Current Time:', now.toLocaleTimeString('en-US', { hour12: false }));
+    console.log('Sunset Time:', todaySunsetTime.toLocaleTimeString('en-US', { hour12: false }));
+    console.log('Time Since Sunset:', Math.round((now - todaySunsetTime) / 1000 / 60), 'minutes ago');
+    console.log('───────────────────────────────────────────────────────────');
+    
+    try {
+      console.log('🔄 Fetching ACTUAL weather observations from Historical API...');
+      const historicalUrl = buildHistoricalUrl(
+        'https://archive-api.open-meteo.com/v1/archive',
+        coords.latitude,
+        coords.longitude,
+        todayDateStr,
+        todayDateStr,
+        ''
+      );
+      
+      const historicalResponse = await fetch(historicalUrl);
+      if (historicalResponse.ok) {
+        historicalTodayData = await historicalResponse.json();
+        console.log('✅ Historical data fetched - will use REAL observations');
+      }
+    } catch (error) {
+      console.warn('❌ Could not fetch historical data, falling back to forecast:', error.message);
+    }
   }
   
+  for (let i = 0; i < apiData.daily.time.length; i++) {
+    // For Day 0 (today) after sunset, use historical data if available
+    if (i === 0 && sunsetHasPassed && historicalTodayData) {
+      const dayData = processDayData(historicalTodayData, 0, historicalTodayData.hourly, aqiData);
+      dayData._dataSource = 'historical'; // Mark that this came from historical data
+      days.push(dayData);
+      
+      console.log('📊 TODAY\'S SCORE (from actual observations):');
+      console.log('   Score:', dayData.sunset_score + '/100');
+      console.log('   High Clouds:', dayData.cloud_coverage_high + '%');
+      console.log('   Mid Clouds:', dayData.cloud_coverage_mid + '%');
+      console.log('   Low Clouds:', dayData.cloud_coverage_low + '%');
+      console.log('   Humidity:', dayData.humidity + '%');
+      console.log('   Data Source: HISTORICAL (actual weather)');
+      console.log('═══════════════════════════════════════════════════════════\n');
+    } else {
+      // Use forecast data as normal
+      const dayData = processDayData(apiData, i, apiData.hourly, aqiData);
+      dayData._dataSource = 'forecast'; // Mark that this came from forecast
+      days.push(dayData);
+    }
+  }
+  console.log('═══════════════════════════════════════════════════════════\n');
+
   return {
     location: locationName,
     latitude: coords.latitude,
@@ -187,7 +161,7 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
   const year = new Date().getFullYear();
   const today = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
   
-  console.log('🔍 Fetching Historical Weather Data:', {
+  logger.debug('🔍 Fetching Historical Weather Data:', {
     latitude,
     longitude,
     year,
@@ -210,7 +184,7 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
     apiKey
   );
   
-  console.log('🌐 Historical API URL:', url);
+  logger.debug('🌐 Historical API URL:', url);
   
   const response = await fetch(url, {
     method: 'GET',
@@ -221,7 +195,7 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
     credentials: 'omit'
   });
   
-  console.log('📡 Historical API Response:', {
+  logger.debug('📡 Historical API Response:', {
     status: response.status,
     ok: response.ok,
     statusText: response.statusText
@@ -229,12 +203,12 @@ export const fetchHistoricalWeatherData = async (latitude, longitude) => {
   
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('❌ Historical API Error:', errorText);
+    logger.error('❌ Historical API Error:', errorText);
     throw new Error(`Historical weather data fetch failed: ${response.status} - ${errorText}`);
   }
   
   const data = await response.json();
-  console.log('📊 Historical API Data:', {
+  logger.debug('📊 Historical API Data:', {
     hasDaily: !!data.daily,
     hasHourly: !!data.hourly,
     dailyLength: data.daily?.time?.length,
@@ -281,7 +255,7 @@ export const fetchHistoricalAirQualityData = async (latitude, longitude) => {
   const data = await response.json();
   
   // DEBUG: Log air quality data for Sep 7
-  console.log('🌫️ Air Quality API Response:', {
+  logger.debug('🌫️ Air Quality API Response:', {
     url: url,
     hasData: !!data,
     hasHourly: !!data.hourly,

@@ -1,18 +1,16 @@
-import React, { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo } from "react";
 import PropTypes from 'prop-types';
 import { Button } from "./components/ui/button";
 import { ArrowUp } from "lucide-react";
 import DayCard from "./DayCard";
 import MinimalHistoricalSunsets from "./components/MinimalHistoricalSunsets";
 import { fetchHistoricalForecastWithProgress } from "./services/historicalService.js";
-import { useScrollContext, useLoadingContext } from "./contexts/AppContext.jsx";
+import { useScrollContext } from "./contexts/AppContext.jsx";
+import { logger } from "./utils/logger.js";
 
 const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
   const [historicalData, setHistoricalData] = useState(null);
   const [isLoadingHistorical, setIsLoadingHistorical] = useState(true);
-  
-  // Use context instead of props
-  const { scrollProgress } = useScrollContext();
 
   // Auto-load historical data when component mounts
   // Only run once when forecast changes (not on every render)
@@ -27,7 +25,7 @@ const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
           name: forecast.location
         };
         
-        console.log('🔍 Fetching Historical Data for:', location);
+        logger.debug('🔍 Fetching Historical Data for:', location);
         
         const data = await fetchHistoricalForecastWithProgress(
           location, 
@@ -35,7 +33,7 @@ const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
         );
         
         if (!isCancelled) {
-          console.log('📊 Historical Data Received:', {
+          logger.debug('📊 Historical Data Received:', {
             hasData: !!data,
             hasTop10: !!data?.top10,
             top10Length: data?.top10?.length,
@@ -51,7 +49,7 @@ const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
           }
         }
       } catch (error) {
-        console.error('❌ Historical Data Error:', error);
+        logger.error('❌ Historical Data Error:', error);
         if (!isCancelled) {
           setIsLoadingHistorical(false);
           
@@ -99,7 +97,7 @@ const SunsetForecast = memo(({ forecast, onBack, onDataLoaded }) => {
                       aria-label="7-day sunset forecast"
                     >
                     {forecast.days.map((day, index) => (
-                      <DayCard key={index} day={day} index={index} />
+                      <DayCard key={index} day={day} />
                     ))}
                   </div>
 

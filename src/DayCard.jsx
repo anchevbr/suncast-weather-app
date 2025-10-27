@@ -1,11 +1,11 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import PropTypes from 'prop-types';
 import { Card } from "./components/ui/card";
 import { Sun } from "lucide-react";
 import WeatherIcon from "./components/weather/WeatherIcon";
 import { getScoreColors } from "./utils/colorPalette";
 
-const DayCard = memo(({ day, index }) => {
+const DayCard = memo(({ day }) => {
   const scoreColors = getScoreColors(day.sunset_score);
 
   return (
@@ -77,8 +77,7 @@ DayCard.propTypes = {
     precipitation_chance: PropTypes.number,
     visibility: PropTypes.number,
     wind_speed: PropTypes.number
-  }).isRequired,
-  index: PropTypes.number.isRequired
+  }).isRequired
 };
 
 export default DayCard;
