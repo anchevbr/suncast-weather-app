@@ -5,6 +5,7 @@ import LocationAutocomplete from './components/LocationAutocomplete';
 import SunsetForecast from "./SunsetForecast";
 import Sun from './components/scene/Sun';
 import Mountains from './components/scene/Mountains';
+// import CityLandmarks from './components/scene/CityLandmarks'; // Disabled for now - will use in production later
 import { getBackgroundGradient } from './utils/backgroundGradient';
 import { useScrollAnimation } from './hooks/useScrollAnimation';
 import { useLocationHandling } from './hooks/useLocationHandling';
@@ -169,6 +170,9 @@ const Home = () => {
           </motion.div>
         </div>
         </div>
+
+      {/* City landmark silhouettes - DISABLED FOR NOW (will use in production later) */}
+      {/* <CityLandmarks scrollProgress={scrollProgress} location={forecast?.location} /> */}
 
       {/* Mountain silhouettes - scrolls with horizontal navigation with parallax effect */}
       <Mountains scrollProgress={scrollProgress} />
