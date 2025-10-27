@@ -37,7 +37,7 @@ export const parseLocationQuery = (locationQuery, customLocationName = null) => 
  * @param {Object} hourlyData - Hourly weather data
  * @returns {Object} Processed day data
  */
-export const processDayData = (apiData, dayIndex, hourlyData) => {
+export const processDayData = (apiData, dayIndex, hourlyData, aqiData = null) => {
   // Get sunset time from daily data
   const sunsetDateTime = apiData.daily.sunset[dayIndex];
   const sunsetTime = sunsetDateTime ? 
@@ -48,7 +48,14 @@ export const processDayData = (apiData, dayIndex, hourlyData) => {
     }) : '18:00';
   
   // Calculate sunset hour index in hourly data
-  const sunsetHour = sunsetDateTime ? new Date(sunsetDateTime).getHours() : 18;
+  // Round to nearest hour for sunset time (same as historical processing)
+  let sunsetHour = 18;
+  if (sunsetDateTime) {
+    const sunsetDate = new Date(sunsetDateTime);
+    const minutes = sunsetDate.getMinutes();
+    // If 30+ minutes past the hour, use next hour
+    sunsetHour = minutes >= 30 ? sunsetDate.getHours() + 1 : sunsetDate.getHours();
+  }
   const sunsetHourIndex = (dayIndex * 24) + sunsetHour;
   
   // Get weather conditions AT THE ACTUAL SUNSET HOUR
@@ -77,6 +84,12 @@ export const processDayData = (apiData, dayIndex, hourlyData) => {
   const visibility = hourlyData.visibility?.[safeHourIndex] || 10000;
   const windSpeed = hourlyData.wind_speed_10m?.[safeHourIndex] || 5;
   
+  // Get AQI for sunset hour (same logic as historical)
+  let aqi = 50; // Default AQI
+  if (aqiData && aqiData.hourly && aqiData.hourly.us_aqi) {
+    aqi = aqiData.hourly.us_aqi[safeHourIndex] || 50;
+  }
+  
   // DEBUG: Log sunset hour conditions
   if (dayIndex < 3) { // Only log first 3 days to avoid spam
     console.log(`🌅 Live Forecast Sunset Conditions Day ${dayIndex + 1}:`, {
@@ -88,7 +101,8 @@ export const processDayData = (apiData, dayIndex, hourlyData) => {
       humidity: humidity,
       precipChance: precipChance,
       visibility: visibility,
-      windSpeed: windSpeed
+      windSpeed: windSpeed,
+      aqi: aqi
     });
   }
   
@@ -105,7 +119,7 @@ export const processDayData = (apiData, dayIndex, hourlyData) => {
     cloud_height_km: cloudInfo.height,
     precipitation_chance: precipChance,
     humidity: humidity,
-    air_quality_index: 50, // Default AQI since we don't have air quality data
+    air_quality_index: Math.round(aqi), // Use real AQI data (same as historical)
     visibility: visibility,
     wind_speed: windSpeed
   };

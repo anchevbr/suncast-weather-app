@@ -13,17 +13,20 @@ export const calculateCloudScore = (cloudData) => {
   let cloudScore = 0;
   
   // High clouds (>8km) are scientifically optimal for sunset colors
+  // CORRECTED: More high clouds = better sunset colors (up to reasonable limit)
   if (cloudCoverageHigh > 0) {
-    if (cloudCoverageHigh >= 25 && cloudCoverageHigh <= 50) {
-      cloudScore += 30; // Optimal high cloud coverage
+    if (cloudCoverageHigh >= 80 && cloudCoverageHigh <= 95) {
+      cloudScore += 40; // EXCELLENT high cloud coverage - perfect for sunsets!
+    } else if (cloudCoverageHigh >= 60 && cloudCoverageHigh < 80) {
+      cloudScore += 35; // Very good high cloud coverage
+    } else if (cloudCoverageHigh >= 40 && cloudCoverageHigh < 60) {
+      cloudScore += 30; // Good high cloud coverage
+    } else if (cloudCoverageHigh >= 25 && cloudCoverageHigh < 40) {
+      cloudScore += 25; // Moderate high cloud coverage
     } else if (cloudCoverageHigh >= 15 && cloudCoverageHigh < 25) {
-      cloudScore += 25; // Good high cloud coverage
-    } else if (cloudCoverageHigh >= 50 && cloudCoverageHigh <= 70) {
-      cloudScore += 20; // Heavy high clouds still good
-    } else if (cloudCoverageHigh > 70) {
-      cloudScore += 15; // Very heavy high clouds
+      cloudScore += 20; // Light high cloud coverage
     } else {
-      cloudScore += 20; // Light high clouds
+      cloudScore += 15; // Very light high clouds
     }
   }
   

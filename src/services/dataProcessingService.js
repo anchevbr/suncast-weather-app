@@ -37,6 +37,11 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
   for (let dayIndex = 0; dayIndex < totalDays; dayIndex++) {
     // Get sunset time from daily data
     const sunsetDateTime = weatherData.daily?.sunset?.[dayIndex];
+    const currentDate = weatherData.daily?.time?.[dayIndex];
+    
+    // Track September and October for detailed debugging
+    const isSeptember = currentDate?.startsWith('2025-09');
+    const isOctober = currentDate?.startsWith('2025-10');
     const sunsetTime = sunsetDateTime ? 
       new Date(sunsetDateTime).toLocaleTimeString('en-US', { 
         hour: '2-digit', 
@@ -45,14 +50,21 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
       }) : '18:00';
     
     // Calculate sunset hour index in hourly data
-    const sunsetHour = sunsetDateTime ? new Date(sunsetDateTime).getHours() : 18;
+    // Round to nearest hour for sunset time
+    let sunsetHour = 18;
+    if (sunsetDateTime) {
+      const sunsetDate = new Date(sunsetDateTime);
+      const minutes = sunsetDate.getMinutes();
+      // If 30+ minutes past the hour, use next hour
+      sunsetHour = minutes >= 30 ? sunsetDate.getHours() + 1 : sunsetDate.getHours();
+    }
     const sunsetHourIndex = (dayIndex * 24) + sunsetHour;
     
     // Get weather conditions AT THE ACTUAL SUNSET HOUR
     const safeHourIndex = Math.min(sunsetHourIndex, (weatherData.hourly?.time?.length || 0) - 1);
     
-    // DEBUG: Log sunset time and hour calculation
-    if (dayIndex < 3) { // Only log first 3 days to avoid spam
+    // DEBUG: Log sunset time and hour calculation (first 3 days only)
+    if (dayIndex < 3) {
       console.log(`📅 Historical Day ${dayIndex + 1}:`, {
         date: weatherData.daily.time[dayIndex],
         sunsetDateTime: sunsetDateTime,
@@ -80,8 +92,8 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
       aqi = aqiData.hourly.us_aqi[safeHourIndex] || SUNSET_CONSTANTS.DEFAULT_AQI;
     }
     
-    // DEBUG: Log sunset hour conditions
-    if (dayIndex < 3) { // Only log first 3 days to avoid spam
+    // DEBUG: Log sunset hour conditions (first 3 days only)
+    if (dayIndex < 3) {
       console.log(`🌅 Historical Sunset Conditions Day ${dayIndex + 1}:`, {
         weatherCode: weatherCode,
         cloudCoverage: cloudCoverage,
@@ -117,8 +129,8 @@ export const processHistoricalSunsetData = (weatherData, aqiData, location, year
     // Apply scoring algorithm using ACTUAL SUNSET HOUR CONDITIONS
     const scoreResult = getSunsetQualityScore(weatherForScoring);
     
-    // DEBUG: Log scoring result
-    if (dayIndex < 3) { // Only log first 3 days to avoid spam
+    // DEBUG: Log scoring result (first 3 days only)
+    if (dayIndex < 3) {
       console.log(`🎯 Historical Scoring Result Day ${dayIndex + 1}:`, {
         score: scoreResult.score,
         conditions: scoreResult.conditions,

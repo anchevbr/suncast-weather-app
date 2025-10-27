@@ -39,6 +39,20 @@ export const getSunsetQualityScore = (weather) => {
   const totalScore = cloudScore + atmosphericScore + bonusScore;
   const finalScore = Math.max(0, Math.min(100, Math.round(totalScore)));
   
+  // DEBUG: Log scoring breakdown for first few calculations
+  const logThis = weather.humidity && weather.humidity >= 30 && weather.humidity <= 50 && weather.cloud_coverage_high >= 40;
+  if (logThis) {
+    console.log('📊 📊 📊 DETAILED SCORING BREAKDOWN 📊 📊 📊');
+    console.log('Cloud Data:', JSON.stringify(cloudData, null, 2));
+    console.log('Atmospheric Data:', JSON.stringify(atmosphericData, null, 2));
+    console.log('Cloud Score:', cloudScore);
+    console.log('Atmospheric Score:', atmosphericScore);
+    console.log('Bonus Score:', bonusScore);
+    console.log('Total Score:', totalScore);
+    console.log('Final Score:', finalScore);
+    console.log('📊 📊 📊 END SCORING BREAKDOWN 📊 📊 📊');
+  }
+  
   // Determine conditions using utility function
   const conditions = getConditionsLabel(finalScore);
   

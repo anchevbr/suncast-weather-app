@@ -94,8 +94,8 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
   // Step 1: Parse coordinates using utility function
   const { coords, locationName } = parseLocationQuery(locationQuery, customLocationName);
 
-  // Step 2: Fetch from Open-Meteo API directly
-  const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
+  // Step 2: Fetch weather data from Open-Meteo API
+  const apiKey = (typeof globalThis.import !== 'undefined' && globalThis.import.meta && globalThis.import.meta.env && globalThis.import.meta.env.VITE_OPENMETEO_API_KEY) || '';
   const baseUrl = getForecastUrl(apiKey);
   const url = buildForecastUrl(baseUrl, coords, apiKey);
   
@@ -115,6 +115,34 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
   
   const apiData = await response.json();
   
+  // Step 3: Fetch air quality data (same as historical)
+  let aqiData = null;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const aqiBaseUrl = getAirQualityUrl(apiKey);
+    const aqiUrl = buildAirQualityUrl(
+      aqiBaseUrl,
+      coords.latitude,
+      coords.longitude,
+      today,
+      today,
+      apiKey
+    );
+    
+    const aqiResponse = await fetch(aqiUrl);
+    if (aqiResponse.ok) {
+      aqiData = await aqiResponse.json();
+      console.log('🌫️ Live Forecast AQI Data:', {
+        hasData: !!aqiData,
+        hasHourly: !!aqiData?.hourly,
+        hasUsAqi: !!aqiData?.hourly?.us_aqi,
+        aqiLength: aqiData?.hourly?.us_aqi?.length
+      });
+    }
+  } catch (error) {
+    console.log('⚠️ Could not fetch AQI data for live forecast:', error);
+  }
+  
   // DEBUG: Log overall API data structure
   console.log(`📊 Live Forecast API Data Structure:`, {
     location: locationName,
@@ -125,14 +153,15 @@ export const fetchForecastData = async (locationQuery, customLocationName = null
     hourlyTimeLength: apiData.hourly?.time?.length,
     hasSunsetData: !!apiData.daily?.sunset,
     firstSunsetTime: apiData.daily?.sunset?.[0],
-    sampleHourlyTime: apiData.hourly?.time?.slice(0, 3)
+    sampleHourlyTime: apiData.hourly?.time?.slice(0, 3),
+    hasAqiData: !!aqiData
   });
   
-  // Step 3: Process the data using utility functions
+  // Step 4: Process the data using utility functions (with AQI data)
   const days = [];
   for (let i = 0; i < apiData.daily.time.length; i++) {
-    // Process day data using ACTUAL SUNSET HOUR CONDITIONS
-    const dayData = processDayData(apiData, i, apiData.hourly);
+    // Process day data using ACTUAL SUNSET HOUR CONDITIONS with AQI
+    const dayData = processDayData(apiData, i, apiData.hourly, aqiData);
     days.push(dayData);
   }
   
@@ -228,7 +257,7 @@ export const fetchHistoricalAirQualityData = async (latitude, longitude) => {
   const endDate = new Date().toISOString().split('T')[0]; // Today's date
   
   // Add API key if using Open-Meteo Commercial (set in environment variable)
-  const apiKey = import.meta.env.VITE_OPENMETEO_API_KEY || '';
+  const apiKey = (typeof globalThis.import !== 'undefined' && globalThis.import.meta && globalThis.import.meta.env && globalThis.import.meta.env.VITE_OPENMETEO_API_KEY) || '';
   
   // Use customer API URL if API key is provided
   const baseUrl = getAirQualityUrl(apiKey);
@@ -250,5 +279,17 @@ export const fetchHistoricalAirQualityData = async (latitude, longitude) => {
   }
   
   const data = await response.json();
+  
+  // DEBUG: Log air quality data for Sep 7
+  console.log('🌫️ Air Quality API Response:', {
+    url: url,
+    hasData: !!data,
+    hasHourly: !!data.hourly,
+    hasUsAqi: !!data.hourly?.us_aqi,
+    aqiLength: data.hourly?.us_aqi?.length,
+    sampleAqi: data.hourly?.us_aqi?.slice(0, 5),
+    sep7Aqi: data.hourly?.us_aqi?.[5995] // Index for Sep 7, 18:46
+  });
+  
   return data;
 };
