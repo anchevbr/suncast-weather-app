@@ -99,13 +99,14 @@ const Home = () => {
             <div className="space-y-4 sm:space-y-6">
               <div className="text-center space-y-2">
                 <h1 
-                  className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-wide bg-gradient-to-r from-orange-400 via-pink-500 to-red-500 bg-clip-text text-transparent" 
-                  style={{ letterSpacing: '-0.02em' }}
+                  className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight bg-gradient-to-r from-orange-400 via-pink-500 to-red-500 bg-clip-text text-transparent" 
+                  style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '-0.02em' }}
                 >
                   Golden Hour
                 </h1>
                 <p 
-                  className="text-xs sm:text-sm md:text-base text-white/80 font-light max-w-md mx-auto leading-relaxed px-4"
+                  className="text-sm sm:text-base md:text-lg text-white/90 font-light max-w-md mx-auto leading-relaxed px-4"
+                  style={{ fontFamily: "'Inter', sans-serif", letterSpacing: '0.01em' }}
                 >
                   Will tonight's sunset be spectacular?
                 </p>
