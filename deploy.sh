@@ -149,17 +149,16 @@ fi
 
 # Setup frontend environment
 echo -e "${YELLOW}⚙️  Setting up frontend environment...${NC}"
-if [ ! -f "$APP_DIR/.env" ]; then
-    cat > $APP_DIR/.env << EOF
+# Get server IP for cache URL
+SERVER_IP=$(hostname -I | awk '{print $1}')
+cat > $APP_DIR/.env << EOF
 VITE_USE_CACHE=true
-VITE_CACHE_SERVER_URL=http://localhost:$BACKEND_PORT
+VITE_CACHE_SERVER_URL=http://${SERVER_IP}:$BACKEND_PORT
 VITE_OPENMETEO_API_KEY=ldi3ld7WP7gJiKTK
+VITE_MAPBOX_API_KEY=sk.eyJ1IjoiYW5jaGV2YnIiLCJhIjoiY21oM3lwYjFqMTE2azJscXpkcW43d21yZCJ9.vB2ZijrgwcCG2YKkj2crhA
 EOF
-    chown $SUDO_USER:$SUDO_USER $APP_DIR/.env
-    echo -e "${GREEN}✅ Frontend .env created${NC}"
-else
-    echo -e "${GREEN}✅ Frontend .env already exists${NC}"
-fi
+chown $SUDO_USER:$SUDO_USER $APP_DIR/.env
+echo -e "${GREEN}✅ Frontend .env created with server IP: ${SERVER_IP}${NC}"
 
 # Build frontend
 echo -e "${YELLOW}🏗️  Building frontend...${NC}"
@@ -289,5 +288,12 @@ if [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "armv7l" ]] || [[ "$ARCH" == "arm
     echo -e "   • Nginx serves static files efficiently"
     echo ""
 fi
+
+echo ""
+echo -e "${YELLOW}⚠️  Important Notes:${NC}"
+echo -e "   • ${YELLOW}Location search${NC} works (using Mapbox API)"
+echo -e "   • ${YELLOW}Browser geolocation${NC} requires HTTPS (use search instead)"
+echo -e "   • To enable HTTPS, set up Let's Encrypt SSL certificate"
+echo ""
 
 echo -e "${GREEN}🎉 Visit http://$SERVER_IP to see your Suncast app!${NC}"
