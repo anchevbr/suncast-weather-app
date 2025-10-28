@@ -68,6 +68,8 @@ else
     echo -e "${YELLOW}📥 Cloning repository...${NC}"
     git clone https://github.com/anchevbr/suncast-weather-app.git $APP_DIR
     cd $APP_DIR
+    # Ensure correct ownership after clone
+    sudo chown -R $USER:$USER $APP_DIR
 fi
 
 # Install backend dependencies
@@ -79,6 +81,10 @@ npm install
 echo -e "${YELLOW}📦 Installing frontend dependencies...${NC}"
 cd $APP_DIR
 npm install
+
+# Install terser (required for Vite build minification)
+echo -e "${YELLOW}📦 Installing terser for build optimization...${NC}"
+npm install -D terser
 
 # Setup environment variables for backend
 echo -e "${YELLOW}⚙️  Setting up backend environment...${NC}"
