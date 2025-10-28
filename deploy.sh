@@ -82,10 +82,6 @@ echo -e "${YELLOW}📦 Installing frontend dependencies...${NC}"
 cd $APP_DIR
 npm install
 
-# Install terser (required for Vite build minification)
-echo -e "${YELLOW}📦 Installing terser for build optimization...${NC}"
-npm install -D terser
-
 # Setup environment variables for backend
 echo -e "${YELLOW}⚙️  Setting up backend environment...${NC}"
 if [ ! -f "$APP_DIR/backend/.env" ]; then
@@ -116,6 +112,9 @@ fi
 echo -e "${YELLOW}🏗️  Building frontend...${NC}"
 cd $APP_DIR
 npm run build
+
+# Ensure ownership is correct after build
+sudo chown -R $USER:$USER $APP_DIR
 
 # Stop existing PM2 processes
 echo -e "${YELLOW}🛑 Stopping existing processes...${NC}"
