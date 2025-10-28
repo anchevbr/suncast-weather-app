@@ -7,6 +7,7 @@
 # Usage: 
 #   Fresh install: sudo ./deploy.sh
 #   Clean & reinstall: sudo ./deploy.sh --clean
+#   With SSL: sudo ./deploy.sh --ssl yourdomain.com
 #########################################
 
 set -e
@@ -22,6 +23,8 @@ APP_DIR="/var/www/suncast"
 BACKEND_PORT=3001
 FRONTEND_PORT=5173
 GITHUB_REPO="https://github.com/anchevbr/suncast-weather-app.git"
+USE_SSL=false
+DOMAIN=""
 
 #########################################
 # CLEANUP FUNCTION
@@ -63,11 +66,41 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Handle --clean flag
-if [ "$1" == "--clean" ]; then
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --clean)
+            CLEAN_INSTALL=true
+            shift
+            ;;
+        --ssl)
+            USE_SSL=true
+            DOMAIN="$2"
+            shift 2
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            echo "Usage: sudo ./deploy.sh [--clean] [--ssl domain.com]"
+            exit 1
+            ;;
+    esac
+done
+
+# Handle clean flag
+if [ "$CLEAN_INSTALL" == "true" ]; then
     cleanup
     echo -e "${YELLOW}Press Enter to continue with fresh installation, or Ctrl+C to exit${NC}"
     read
+fi
+
+# Validate SSL setup
+if [ "$USE_SSL" == "true" ]; then
+    if [ -z "$DOMAIN" ]; then
+        echo -e "${RED}Error: --ssl requires a domain name${NC}"
+        echo "Usage: sudo ./deploy.sh --ssl yourdomain.com"
+        exit 1
+    fi
+    echo -e "${YELLOW}📜 SSL will be configured for: $DOMAIN${NC}"
 fi
 
 echo -e "${GREEN}"
@@ -85,7 +118,17 @@ echo -e "${YELLOW}🔍 Detected architecture: $ARCH${NC}"
 # Install system dependencies
 echo -e "${YELLOW}📦 Installing system dependencies...${NC}"
 apt update
-apt install -y curl git nginx
+
+# Base packages
+PACKAGES="curl git nginx"
+
+# Add certbot if SSL is requested
+if [ "$USE_SSL" == "true" ]; then
+    PACKAGES="$PACKAGES certbot python3-certbot-nginx"
+    echo -e "${YELLOW}📜 Adding certbot for SSL certificate${NC}"
+fi
+
+apt install -y $PACKAGES
 
 # Install Node.js
 if ! command -v node &> /dev/null; then
@@ -191,7 +234,64 @@ sudo -u $SUDO_USER pm2 save
 
 # Configure Nginx
 echo -e "${YELLOW}🔧 Configuring Nginx...${NC}"
-cat > /etc/nginx/sites-available/suncast << 'EOF'
+
+# Get server IP
+SERVER_IP=$(hostname -I | awk '{print $1}')
+
+if [ "$USE_SSL" == "true" ]; then
+    # SSL Configuration
+    cat > /etc/nginx/sites-available/suncast << EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $DOMAIN;
+
+    # Redirect HTTP to HTTPS
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name $DOMAIN;
+
+    # SSL certificates will be added by certbot
+    
+    # Frontend - serve built static files
+    location / {
+        root /var/www/suncast/dist;
+        try_files \$uri \$uri/ /index.html;
+        
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+
+    # Backend API
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml+rss;
+}
+EOF
+else
+    # HTTP Only Configuration
+    cat > /etc/nginx/sites-available/suncast << 'EOF'
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -228,6 +328,7 @@ server {
     gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml+rss;
 }
 EOF
+fi
 
 # Enable site and remove default
 ln -sf /etc/nginx/sites-available/suncast /etc/nginx/sites-enabled/
@@ -240,6 +341,30 @@ nginx -t
 echo -e "${YELLOW}🔄 Reloading Nginx...${NC}"
 systemctl restart nginx
 systemctl enable nginx
+
+# Setup SSL if requested
+if [ "$USE_SSL" == "true" ]; then
+    echo -e "${YELLOW}📜 Setting up SSL certificate with Let's Encrypt...${NC}"
+    echo -e "${YELLOW}⚠️  Make sure $DOMAIN points to $SERVER_IP${NC}"
+    echo -e "${YELLOW}Press Enter to continue with SSL setup, or Ctrl+C to skip${NC}"
+    read
+    
+    certbot --nginx -d $DOMAIN --non-interactive --agree-tos --register-unsafely-without-email --redirect
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ SSL certificate installed successfully!${NC}"
+        echo -e "${GREEN}🔒 Your site is now available at https://$DOMAIN${NC}"
+        
+        # Setup auto-renewal
+        systemctl enable certbot.timer
+        systemctl start certbot.timer
+        echo -e "${GREEN}✅ SSL auto-renewal enabled${NC}"
+    else
+        echo -e "${RED}❌ SSL certificate installation failed${NC}"
+        echo -e "${YELLOW}Your site is still available at http://$SERVER_IP${NC}"
+        echo -e "${YELLOW}Note: Geolocation requires HTTPS${NC}"
+    fi
+fi
 
 # Setup firewall
 echo -e "${YELLOW}🔥 Configuring firewall...${NC}"
@@ -263,7 +388,14 @@ echo ""
 echo -e "${YELLOW}📍 Application Info:${NC}"
 echo -e "   Architecture:     $ARCH"
 echo -e "   App Directory:    $APP_DIR"
-echo -e "   App URL:          ${GREEN}http://$SERVER_IP${NC}"
+
+if [ "$USE_SSL" == "true" ]; then
+    echo -e "   App URL:          ${GREEN}https://$DOMAIN${NC} 🔒"
+    echo -e "   HTTP URL:         http://$SERVER_IP (redirects to HTTPS)"
+else
+    echo -e "   App URL:          ${GREEN}http://$SERVER_IP${NC}"
+fi
+
 echo -e "   Backend Port:     $BACKEND_PORT"
 echo -e "   Frontend Port:    $FRONTEND_PORT"
 echo ""
@@ -272,9 +404,22 @@ echo -e "   View logs:        pm2 logs"
 echo -e "   Check status:     pm2 status"
 echo -e "   Restart:          pm2 restart all"
 echo -e "   Update app:       cd $APP_DIR && git pull && npm install && npm run build && pm2 restart all"
+
+if [ "$USE_SSL" == "true" ]; then
+    echo -e "   Renew SSL:        certbot renew --dry-run (test) | certbot renew (actual)"
+fi
+
 echo ""
 echo -e "${YELLOW}🔄 To reinstall from scratch:${NC}"
 echo -e "   sudo ./deploy.sh --clean"
+
+if [ "$USE_SSL" == "false" ]; then
+    echo ""
+    echo -e "${YELLOW}🔒 To enable HTTPS/SSL:${NC}"
+    echo -e "   1. Point a domain to $SERVER_IP"
+    echo -e "   2. Run: sudo ./deploy.sh --ssl yourdomain.com"
+fi
+
 echo ""
 
 # Display PM2 status
@@ -291,9 +436,21 @@ fi
 
 echo ""
 echo -e "${YELLOW}⚠️  Important Notes:${NC}"
-echo -e "   • ${YELLOW}Location search${NC} works (using Mapbox API)"
-echo -e "   • ${YELLOW}Browser geolocation${NC} requires HTTPS (use search instead)"
-echo -e "   • To enable HTTPS, set up Let's Encrypt SSL certificate"
+
+if [ "$USE_SSL" == "true" ]; then
+    echo -e "   • ✅ ${GREEN}HTTPS enabled${NC} - Browser geolocation will work!"
+    echo -e "   • ✅ ${GREEN}Location search${NC} works (using Mapbox API)"
+    echo -e "   • 🔒 SSL certificate auto-renews every 90 days"
+else
+    echo -e "   • ✅ ${GREEN}Location search${NC} works (using Mapbox API)"
+    echo -e "   • ⚠️  ${YELLOW}Browser geolocation${NC} requires HTTPS"
+    echo -e "   • 💡 Run with --ssl flag to enable geolocation"
+fi
+
 echo ""
 
-echo -e "${GREEN}🎉 Visit http://$SERVER_IP to see your Suncast app!${NC}"
+if [ "$USE_SSL" == "true" ]; then
+    echo -e "${GREEN}🎉 Visit https://$DOMAIN to see your Suncast app!${NC}"
+else
+    echo -e "${GREEN}🎉 Visit http://$SERVER_IP to see your Suncast app!${NC}"
+fi
