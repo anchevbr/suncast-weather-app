@@ -25,11 +25,24 @@ echo -e "${YELLOW}📦 Installing system dependencies...${NC}"
 sudo apt update
 sudo apt install -y curl git nginx
 
+# Detect architecture
+ARCH=$(uname -m)
+echo -e "${YELLOW}🔍 Detected architecture: $ARCH${NC}"
+
 # Install Node.js (if not installed)
 if ! command -v node &> /dev/null; then
     echo -e "${YELLOW}📦 Installing Node.js...${NC}"
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt install -y nodejs
+    
+    if [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "armv7l" ]] || [[ "$ARCH" == "armv6l" ]]; then
+        # Raspberry Pi - use NodeSource for ARM
+        echo -e "${YELLOW}📱 Detected ARM/Raspberry Pi - installing Node.js 20 LTS...${NC}"
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt install -y nodejs
+    else
+        # x86_64 - standard installation
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt install -y nodejs
+    fi
 fi
 
 echo -e "${GREEN}✅ Node.js version: $(node --version)${NC}"
@@ -223,6 +236,7 @@ echo -e "${GREEN}║                                                        ║$
 echo -e "${GREEN}╚════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${YELLOW}📍 Application Details:${NC}"
+echo -e "   Architecture:     $ARCH"
 echo -e "   App Directory:    $APP_DIR"
 echo -e "   Frontend URL:     http://$DOMAIN"
 echo -e "   Backend Port:     $BACKEND_PORT"
@@ -246,3 +260,16 @@ echo -e "   2. Push to GitHub: git push origin main"
 echo -e "   3. On server, run: $APP_DIR/update.sh"
 echo -e "   Or use the auto-deploy webhook (see documentation)"
 echo ""
+
+# Raspberry Pi specific notes
+if [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "armv7l" ]] || [[ "$ARCH" == "armv6l" ]]; then
+    echo -e "${YELLOW}🍓 Raspberry Pi Tips:${NC}"
+    echo -e "   • First build may take 5-10 minutes (ARM is slower)"
+    echo -e "   • Cache helps reduce API calls and improve performance"
+    echo -e "   • Consider increasing swap if build fails: sudo dphys-swapfile swapoff"
+    echo -e "                                              sudo nano /etc/dphys-swapfile"
+    echo -e "                                              (set CONF_SWAPSIZE=2048)"
+    echo -e "                                              sudo dphys-swapfile setup"
+    echo -e "                                              sudo dphys-swapfile swapon"
+    echo ""
+fi
