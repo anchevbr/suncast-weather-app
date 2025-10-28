@@ -8,7 +8,10 @@ import { processHistoricalSunsetData, getTop10Sunsets, getScoreStatistics } from
 import { logger } from '../utils/logger.js';
 
 // Cache server configuration
-const CACHE_SERVER_URL = import.meta.env.VITE_CACHE_SERVER_URL || 'http://localhost:3001';
+// Empty string means use same origin (production), localhost for development
+const CACHE_SERVER_URL = import.meta.env.VITE_CACHE_SERVER_URL !== undefined 
+  ? import.meta.env.VITE_CACHE_SERVER_URL 
+  : 'http://localhost:3001';
 const USE_CACHE_SERVER = import.meta.env.VITE_USE_CACHE === 'true';
 
 /**
