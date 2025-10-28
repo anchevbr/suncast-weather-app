@@ -77,11 +77,17 @@ export const fetchHistoricalForecastWithProgress = async (location, onProgress) 
     
     let weatherData, aqiData, processedData;
     
-    if (cachedData && cachedData.days && cachedData.days.length > 0) {
-      // We have cached data - use it directly
-      logger.debug(`📦 Using ${cachedData.days.length} days from cache`);
-      onProgress({ stage: 'loading_from_cache', progress: 75 });
-      processedData = cachedData.days;
+    if (cachedData && cachedData.metadata?.cached) {
+      // We have cached RAW data - process it
+      logger.debug(`📦 Using cached raw data, processing locally`);
+      onProgress({ stage: 'loading_from_cache', progress: 50 });
+      
+      weatherData = cachedData.weather;
+      aqiData = cachedData.aqi;
+      
+      // Progress: Processing cached data
+      onProgress({ stage: 'processing_data', progress: 75 });
+      processedData = processHistoricalSunsetData(weatherData, aqiData, location, year);
       
     } else {
       // No cache or cache miss - fetch from API

@@ -2,20 +2,25 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { config } from 'dotenv';
 import {
   initializeCache,
   getCachedData,
   saveCachedData,
-  getMissingDates,
-  mergeCachedData,
-  getCacheStats
+  getCacheStats,
+  clearLocationCache,
+  clearAllCache
 } from './cacheManager.js';
+
+// Load environment variables
+config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const OPENMETEO_API_KEY = process.env.OPENMETEO_API_KEY;
 
 // Middleware
 app.use(cors());
@@ -25,13 +30,52 @@ app.use(express.json());
 initializeCache().catch(console.error);
 
 /**
+ * Fetch air quality data from Open-Meteo API
+ */
+async function fetchAirQualityFromAPI(latitude, longitude, startDate, endDate) {
+  const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&start_date=${startDate}&end_date=${endDate}&hourly=us_aqi&timezone=auto`;
+  
+  console.log(`🌫️ Fetching air quality data: ${startDate} to ${endDate}`);
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json'
+    },
+    mode: 'cors',
+    credentials: 'omit'
+  });
+  
+  if (!response.ok) {
+    console.warn(`⚠️ Air quality API returned ${response.status}, continuing without AQI data`);
+    return null;
+  }
+  
+  return await response.json();
+}
+
+/**
  * Fetch historical data from Open-Meteo API
  */
 async function fetchHistoricalFromAPI(latitude, longitude, startDate, endDate) {
-  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${startDate}&end_date=${endDate}&daily=sunset,sunrise,temperature_2m_max,temperature_2m_min,precipitation_sum,rain_sum,snowfall_sum,weathercode&timezone=auto`;
+  // NOTE: Using free Archive API - no API key needed for historical data
+  // The commercial API key is only for forecast data
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${startDate}&end_date=${endDate}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunset,sunrise&timezone=auto`;
   
-  const response = await fetch(url);
+  console.log(`🌐 Fetching from Open-Meteo Archive API: ${startDate} to ${endDate}`);
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json'
+    },
+    mode: 'cors',
+    credentials: 'omit'
+  });
+  
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ API Error (${response.status}):`, errorText);
     throw new Error(`API request failed: ${response.statusText}`);
   }
   
@@ -39,43 +83,22 @@ async function fetchHistoricalFromAPI(latitude, longitude, startDate, endDate) {
 }
 
 /**
- * Process raw API data into sunset scores
+ * Process raw API data - Just pass through the raw data structure
+ * The frontend will handle all the sunset scoring logic
  */
-function processHistoricalData(rawData) {
-  // Import your existing sunset scoring logic here
-  // This should match your existing historicalService.js processing
-  const { daily } = rawData;
+function processHistoricalData(rawData, aqiData) {
+  const { daily, hourly } = rawData;
   
   if (!daily || !daily.time) {
     return { days: [] };
   }
   
-  const days = daily.time.map((date, index) => {
-    // Basic processing - you should import your actual scoring logic
-    const sunset = daily.sunset?.[index];
-    const sunrise = daily.sunrise?.[index];
-    const weatherCode = daily.weathercode?.[index];
-    const tempMax = daily.temperature_2m_max?.[index];
-    const tempMin = daily.temperature_2m_min?.[index];
-    const precipitation = daily.precipitation_sum?.[index];
-    
-    // Placeholder score - replace with your actual scoring algorithm
-    const sunsetScore = weatherCode !== undefined ? Math.max(0, Math.min(100, 100 - weatherCode)) : 50;
-    
-    return {
-      date,
-      sunset,
-      sunrise,
-      sunset_score: sunsetScore,
-      weather_code: weatherCode,
-      temperature_max: tempMax,
-      temperature_min: tempMin,
-      precipitation,
-      conditions: getConditionsFromWeatherCode(weatherCode)
-    };
-  });
-  
-  return { days };
+  // Return the raw data structure that matches what the frontend expects
+  return {
+    daily: rawData.daily,
+    hourly: rawData.hourly,
+    aqi: aqiData?.hourly || null
+  };
 }
 
 /**
@@ -115,7 +138,7 @@ function getConditionsFromWeatherCode(code) {
 }
 
 /**
- * API endpoint: Get historical data with caching
+ * API endpoint: Get historical data with simple caching
  */
 app.get('/api/historical', async (req, res) => {
   try {
@@ -131,63 +154,43 @@ app.get('/api/historical', async (req, res) => {
     const lon = parseFloat(longitude);
     const locationName = location || `${lat},${lon}`;
     
-    console.log(`\n🔍 Historical data request for ${locationName} (${startDate} to ${endDate})`);
+    // Limit end date to today (Archive API constraint)
+    const today = new Date().toISOString().split('T')[0];
+    const actualEndDate = endDate > today ? today : endDate;
     
-    // Check what dates are missing from cache
-    const { startDate: fetchStart, endDate: fetchEnd, cachedData, missingDatesCount } = 
-      await getMissingDates(lat, lon, startDate, endDate);
+    console.log(`\n🔍 Request: ${locationName} (${startDate} to ${actualEndDate})`);
     
-    if (!fetchStart) {
-      // All data is cached
-      console.log(`✅ Serving ${cachedData.days.length} days from cache`);
-      
-      // Filter to requested date range
-      const filteredDays = cachedData.days.filter(day => {
-        return day.date >= startDate && day.date <= endDate;
-      });
-      
+    // Check cache first
+    const cachedData = await getCachedData(lat, lon);
+    
+    if (cachedData) {
+      console.log(`✅ Serving from cache`);
       return res.json({
-        ...cachedData,
-        days: filteredDays,
-        metadata: {
-          ...cachedData.metadata,
-          fromCache: true,
-          totalDays: filteredDays.length
-        }
+        weather: { daily: cachedData.daily, hourly: cachedData.hourly },
+        aqi: cachedData.aqi,
+        metadata: { fromCache: true, location: cachedData.location }
       });
     }
     
-    // Fetch missing data from API
-    console.log(`🌐 Fetching ${missingDatesCount} missing days from API...`);
-    const rawData = await fetchHistoricalFromAPI(lat, lon, fetchStart, fetchEnd);
-    const processedData = processHistoricalData(rawData);
+    // No cache - fetch from API
+    console.log(`🌐 Fetching from API...`);
+    const rawWeatherData = await fetchHistoricalFromAPI(lat, lon, startDate, actualEndDate);
+    const rawAqiData = await fetchAirQualityFromAPI(lat, lon, startDate, actualEndDate);
     
-    // Merge with cached data
-    await mergeCachedData(lat, lon, locationName, processedData);
+    // Store raw data
+    const rawData = processHistoricalData(rawWeatherData, rawAqiData);
+    await saveCachedData(lat, lon, locationName, rawData);
     
-    // Load complete merged data
-    const completeData = await getCachedData(lat, lon);
-    
-    // Filter to requested date range
-    const filteredDays = completeData.days.filter(day => {
-      return day.date >= startDate && day.date <= endDate;
-    });
-    
-    console.log(`✅ Returning ${filteredDays.length} days (${processedData.days.length} newly fetched, rest from cache)`);
+    console.log(`✅ Data cached and returned`);
     
     res.json({
-      ...completeData,
-      days: filteredDays,
-      metadata: {
-        ...completeData.metadata,
-        fromCache: false,
-        newDaysFetched: processedData.days.length,
-        totalDays: filteredDays.length
-      }
+      weather: { daily: rawData.daily, hourly: rawData.hourly },
+      aqi: rawData.aqi,
+      metadata: { fromCache: false }
     });
     
   } catch (error) {
-    console.error('❌ Error fetching historical data:', error);
+    console.error('❌ Error:', error.message);
     res.status(500).json({ 
       error: 'Failed to fetch historical data',
       details: error.message 

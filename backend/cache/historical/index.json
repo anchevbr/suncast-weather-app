@@ -1,8 +1,16 @@
 {
   "version": "1.0",
-  "locations": {},
+  "locations": {
+    "37.99_23.74": {
+      "name": "Athens, Greece",
+      "latitude": 37.99112410606954,
+      "longitude": 23.744820529450575,
+      "lastUpdated": "2025-10-28T10:53:38.748Z",
+      "totalDays": 301
+    }
+  },
   "stats": {
-    "totalCachedDays": 0,
-    "lastUpdated": "2025-10-27T19:50:00.000Z"
+    "totalCachedDays": 301,
+    "lastUpdated": "2025-10-28T10:53:38.748Z"
   }
 }

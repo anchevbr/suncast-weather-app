@@ -102,6 +102,7 @@ async function saveCacheIndex(index) {
 
 /**
  * Get cached historical data for a location
+ * Converts human-readable format back to API format
  */
 async function getCachedData(latitude, longitude) {
   const cacheKey = getCacheKey(latitude, longitude);
@@ -111,8 +112,32 @@ async function getCachedData(latitude, longitude) {
     const data = await fs.readFile(cacheFile, 'utf-8');
     const cached = JSON.parse(data);
     
-    console.log(`📦 Cache hit for ${cacheKey} - ${cached.days?.length || 0} days cached`);
-    return cached;
+    // Convert from CSV-like format back to API format
+    const convertToApiFormat = (rows, timeKey = 'date') => {
+      if (!rows || rows.length === 0) return null;
+      
+      const result = {};
+      const keys = Object.keys(rows[0]);
+      
+      keys.forEach(key => {
+        result[key === timeKey ? 'time' : key] = rows.map(row => row[key]);
+      });
+      
+      return result;
+    };
+    
+    const apiFormat = {
+      location: cached.location,
+      cachedAt: cached.cachedAt,
+      metadata: cached.metadata,
+      daily: convertToApiFormat(cached.daily, 'date'),
+      hourly: convertToApiFormat(cached.hourly, 'time'),
+      aqi: cached.aqi ? convertToApiFormat(cached.aqi, 'time') : null
+    };
+    
+    const totalDays = cached.daily?.length || 0;
+    console.log(`📦 Cache hit for ${cacheKey} - ${totalDays} days cached`);
+    return apiFormat;
   } catch (error) {
     console.log(`📭 Cache miss for ${cacheKey}`);
     return null;
@@ -121,12 +146,71 @@ async function getCachedData(latitude, longitude) {
 
 /**
  * Save historical data to cache
+ * Now stores RAW API data (daily, hourly, aqi) in human-readable format
  */
 async function saveCachedData(latitude, longitude, locationName, data) {
   const cacheKey = getCacheKey(latitude, longitude);
   const cacheFile = getCacheFilePath(cacheKey);
   
   try {
+    // Calculate total days from raw daily data
+    const totalDays = data.daily?.time?.length || 0;
+    const dateRange = totalDays > 0 ? {
+      start: data.daily.time[0],
+      end: data.daily.time[totalDays - 1]
+    } : null;
+    
+    // Transform data into more readable format (like CSV rows)
+    const dailyData = [];
+    if (data.daily && data.daily.time) {
+      for (let i = 0; i < data.daily.time.length; i++) {
+        const dayData = { date: data.daily.time[i] };
+        
+        // Add all daily fields for this date
+        Object.keys(data.daily).forEach(key => {
+          if (key !== 'time') {
+            dayData[key] = data.daily[key][i];
+          }
+        });
+        
+        dailyData.push(dayData);
+      }
+    }
+    
+    // Transform hourly data into readable rows
+    const hourlyData = [];
+    if (data.hourly && data.hourly.time) {
+      for (let i = 0; i < data.hourly.time.length; i++) {
+        const hourData = { time: data.hourly.time[i] };
+        
+        // Add all hourly fields for this time
+        Object.keys(data.hourly).forEach(key => {
+          if (key !== 'time') {
+            hourData[key] = data.hourly[key][i];
+          }
+        });
+        
+        hourlyData.push(hourData);
+      }
+    }
+    
+    // Transform AQI data into readable rows
+    const aqiData = [];
+    if (data.aqi && data.aqi.time) {
+      for (let i = 0; i < data.aqi.time.length; i++) {
+        const aqiHour = { time: data.aqi.time[i] };
+        
+        // Add all AQI fields for this time
+        Object.keys(data.aqi).forEach(key => {
+          if (key !== 'time') {
+            aqiHour[key] = data.aqi[key][i];
+          }
+        });
+        
+        aqiData.push(aqiHour);
+      }
+    }
+    
     const cacheData = {
       location: {
         name: locationName,
@@ -135,16 +219,17 @@ async function saveCachedData(latitude, longitude, locationName, data) {
         cacheKey
       },
       cachedAt: new Date().toISOString(),
-      days: data.days || [],
       metadata: {
-        totalDays: data.days?.length || 0,
-        dateRange: {
-          start: data.days?.[0]?.date,
-          end: data.days?.[data.days.length - 1]?.date
-        }
-      }
+        totalDays,
+        dateRange
+      },
+      // Human-readable data organized like CSV rows
+      daily: dailyData,
+      hourly: hourlyData,
+      aqi: aqiData.length > 0 ? aqiData : null
     };
     
+    // Save with pretty formatting (2 spaces indentation)
     await fs.writeFile(cacheFile, JSON.stringify(cacheData, null, 2));
     
     // Update index
@@ -154,7 +239,7 @@ async function saveCachedData(latitude, longitude, locationName, data) {
       latitude,
       longitude,
       lastUpdated: new Date().toISOString(),
-      totalDays: cacheData.metadata.totalDays
+      totalDays
     };
     index.stats.totalCachedDays = Object.values(index.locations).reduce(
       (sum, loc) => sum + (loc.totalDays || 0), 0
@@ -163,87 +248,12 @@ async function saveCachedData(latitude, longitude, locationName, data) {
     
     await saveCacheIndex(index);
     
-    console.log(`💾 Cached ${cacheData.metadata.totalDays} days for ${locationName} (${cacheKey})`);
+    console.log(`💾 Cached ${totalDays} days for ${locationName} (${cacheKey})`);
     return true;
   } catch (error) {
     console.error('Failed to save cache:', error);
     return false;
   }
-}
-
-/**
- * Determine which dates need to be fetched (not in cache)
- */
-async function getMissingDates(latitude, longitude, requestedStartDate, requestedEndDate) {
-  const cached = await getCachedData(latitude, longitude);
-  
-  if (!cached || !cached.days || cached.days.length === 0) {
-    // No cache, fetch everything
-    return { startDate: requestedStartDate, endDate: requestedEndDate, cachedData: null };
-  }
-  
-  // Get cached date range
-  const cachedDates = new Set(cached.days.map(day => day.date));
-  const requested = {
-    start: new Date(requestedStartDate),
-    end: new Date(requestedEndDate)
-  };
-  
-  // Find missing dates
-  const missingDates = [];
-  let current = new Date(requested.start);
-  
-  while (current <= requested.end) {
-    const dateStr = current.toISOString().split('T')[0];
-    if (!cachedDates.has(dateStr)) {
-      missingDates.push(dateStr);
-    }
-    current.setDate(current.getDate() + 1);
-  }
-  
-  if (missingDates.length === 0) {
-    console.log(`✅ All requested dates already cached`);
-    return { startDate: null, endDate: null, cachedData: cached };
-  }
-  
-  // Find continuous date ranges to fetch
-  const newStartDate = missingDates[0];
-  const newEndDate = missingDates[missingDates.length - 1];
-  
-  console.log(`📅 Need to fetch ${missingDates.length} missing dates: ${newStartDate} to ${newEndDate}`);
-  
-  return { 
-    startDate: newStartDate, 
-    endDate: newEndDate, 
-    cachedData: cached,
-    missingDatesCount: missingDates.length
-  };
-}
-
-/**
- * Merge new data with cached data
- */
-async function mergeCachedData(latitude, longitude, locationName, newData) {
-  const cached = await getCachedData(latitude, longitude);
-  
-  if (!cached || !cached.days) {
-    // No existing cache, save as new
-    return await saveCachedData(latitude, longitude, locationName, newData);
-  }
-  
-  // Merge days, avoiding duplicates
-  const existingDates = new Set(cached.days.map(day => day.date));
-  const newDays = newData.days.filter(day => !existingDates.has(day.date));
-  
-  const mergedData = {
-    days: [...cached.days, ...newDays].sort((a, b) => 
-      new Date(a.date) - new Date(b.date)
-    )
-  };
-  
-  console.log(`🔄 Merging ${newDays.length} new days with ${cached.days.length} cached days`);
-  
-  return await saveCachedData(latitude, longitude, locationName, mergedData);
 }
 
 /**
@@ -325,8 +335,6 @@ export {
   getCacheKey,
   getCachedData,
   saveCachedData,
-  getMissingDates,
-  mergeCachedData,
   getCacheStats,
   clearLocationCache,
   clearAllCache,
